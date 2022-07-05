@@ -17,6 +17,7 @@ enum Role {
 	case beholder
 	case jester
 	case cookiePerson
+  case furry
 
 	func isValid(with roles: [Role], playerCount count: Int) -> Bool {
 		guard roles.filter({ $0 == self }).count < self.absoluteMax else {
@@ -67,6 +68,8 @@ enum Role {
 			return "Jester"
 		case .cookiePerson:
 			return "Cookie Person"
+    case .furry:
+      return "Furry"
 		}
 	}
 	var roleDescription: String {
@@ -85,11 +88,13 @@ enum Role {
 			return "You have one goal: get the village to exile you."
 		case .cookiePerson:
 			return "Every night, you can choose to visit someone and give them cookies. If you visit a wolf, you will be killed. However, if you're visiting someone and the wolves try to kill you, you'll survive! (because you weren't home). If the wolves kill someone you're visiting, they'll kill you as well."
-		}
+		case .furry:
+      return "You cosplay as an animal, which often gets you mistaken for a werewolf."
+    }
 	}
 
 	static let good: [Role] = [.guardianAngel, .seer, .beholder]
-	static let neutral: [Role] = [.villager, .jester, .cookiePerson]
+	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry]
 	static let evil: [Role] = [.werewolf]
 }
 
@@ -497,8 +502,12 @@ class State {
 			case .check(let who):
 				let name = roles[who]!.roleName
 				let dm = try await bot.getDM(for: action.key)
-				_ = try await dm?.send(EmbedBuilder.bad.setDescription(description: "<@\(who.rawValue)> is a \(name)!"))
-			case .kill(let who):
+        if (name = "Furry"){
+          _ = try await dm?.send(EmbedBuilder.bad.setDescription(description: "<@\(who.rawValue)> is a furry!"))
+        } else {
+				  _ = try await dm?.send(EmbedBuilder.bad.setDescription(description: "<@\(who.rawValue)> is a \(name)!"))
+			  }
+      case .kill(let who):
 				_ = try await thread?.send(EmbedBuilder.bad.setDescription(description: "The Werewolves try to kill <@\(who.rawValue)>..."))
 				try await Task.sleep(nanoseconds: 3_000_000_000)
 				if actions.contains(where: { $0.value == .protect(who: who)}) {
@@ -736,7 +745,7 @@ class MyBot: ListenerAdapter {
 		switch event.selectedValue.customId {
 		case "werewolf-kill":
 			guard state.roles[event.user.id] == .werewolf else {
-				try await event.reply(message: "You aren't werewolf!")
+				try await event.reply(message: "You aren't a werewolf!")
 				return
 			}
 			if state.timeOfYear == .earlyWinter || state.timeOfYear == .lateWinter {
@@ -748,14 +757,14 @@ class MyBot: ListenerAdapter {
 			}
 		case "guardianAngel-protect":
 			guard state.roles[event.user.id] == .guardianAngel else {
-				try await event.reply(message: "You aren't guardianAngel!")
+				try await event.reply(message: "You aren't a guardian angel!")
 				return
 			}
 			try await event.reply(message: "You're going to protect <@\(event.selectedValue.value)> tonight!")
 			state.actions[event.user.id] = .protect(who: target)
 		case "seer-investigate":
 			guard state.roles[event.user.id] == .seer else {
-				try await event.reply(message: "You aren't seer!")
+				try await event.reply(message: "You aren't a seer!")
 				return
 			}
 			try await event.reply(message: "You're going to investigate <@\(event.selectedValue.value)> tonight!")

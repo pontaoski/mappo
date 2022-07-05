@@ -1,6 +1,7 @@
 import Swiftcord
 import NIO
 import Foundation
+import AsyncKit
 
 struct Config: Codable {
 	var token: String
@@ -15,6 +16,7 @@ enum Role {
 	case seer
 	case beholder
 	case jester
+	case cookiePerson
 
 	func isValid(with roles: [Role], playerCount count: Int) -> Bool {
 		guard roles.filter({ $0 == self }).count < self.absoluteMax else {
@@ -33,7 +35,7 @@ enum Role {
 
 	var absoluteMax: Int {
 		switch self {
-		case .guardianAngel, .seer, .beholder, .jester:
+		case .guardianAngel, .seer, .beholder, .jester, .cookiePerson:
 			return 1
 		default:
 			return Int.max
@@ -43,7 +45,7 @@ enum Role {
 		switch self {
 		case .jester:
 			return 7
-		case .beholder:
+		case .beholder, .cookiePerson:
 			return 5
 		default:
 			return 0
@@ -63,6 +65,8 @@ enum Role {
 			return "Beholder"
 		case .jester:
 			return "Jester"
+		case .cookiePerson:
+			return "Cookie Person"
 		}
 	}
 	var roleDescription: String {
@@ -70,27 +74,40 @@ enum Role {
 		case .villager:
 			return "You are but a simple villager, with the ability to vote people out."
 		case .werewolf:
-			return "You are the werewolf! Eat everyone!"
+			return "You are the werewolf! Eat everyone, but try not to get caught!"
 		case .guardianAngel:
-			return "You are an angel from heaven, allowing you to protect one person every night."
+			return "Each night, you can protect one person, but be careful: if you protect a werewolf, there's a 50% chance they might eat you!"
 		case .seer:
-			return "Your seer skills allow you to reveal one person every night."
+			return "Your wisdom allows you to choose a player every night. Their role will be revealed to be you. Be careful, if you reveal you're the seer, the wolves might try to kill you!"
 		case .beholder:
 			return "You have one job: you know who the Seer is."
 		case .jester:
 			return "You have one goal: get the village to exile you."
+		case .cookiePerson:
+			return "Every night, you can choose to visit someone and give them cookies. If you visit a wolf, you will be killed. However, if you're visiting someone and the wolves try to kill you, you'll survive! (because you weren't home). If the wolves kill someone you're visiting, they'll kill you as well."
 		}
 	}
 
 	static let good: [Role] = [.guardianAngel, .seer, .beholder]
-	static let neutral: [Role] = [.villager, .jester]
+	static let neutral: [Role] = [.villager, .jester, .cookiePerson]
 	static let evil: [Role] = [.werewolf]
 }
 
 enum Action: Equatable {
 	case kill(who: Snowflake)
+	case freeze(who: Snowflake)
 	case protect(who: Snowflake)
 	case check(who: Snowflake)
+	case giveCookies(to: Snowflake)
+
+	var awayFromHome: Bool {
+		switch self {
+		case .kill, .giveCookies:
+			return true
+		case .freeze, .protect, .check:
+			return false
+		}
+	}
 }
 
 enum GameState {
@@ -237,8 +254,6 @@ class State {
 	func assignRoles() async throws {
 		clear()
 
-		// TODO: create a thread
-		thread = channel
 		state = .assigned
 
 		self.day = 1
@@ -291,10 +306,18 @@ class State {
 	func startPlaying() async throws {
 		state = .playing
 
+		// TODO: create a thread
+		thread = try await bot.createThread(in: channel.id, StartThreadData(name: "Mappo Game"))
+
+		let partyPings = party.map { "<@\($0)> "}.joined(separator: ", ")
+		_ = try await thread?.send("\(partyPings), get over here!")
+		_ = try await Task.sleep(nanoseconds: 5_000_000_000)
+
 		while state == .playing {
 			_ = try await thread?.send("Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!")
 
 			// night actions
+			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Night of \(timeOfYear.name) of Year \(year) (Game Day \(day))"))
 			try await startNight()
 			try await Task.sleep(nanoseconds: 35_000_000_000)
 
@@ -302,6 +325,9 @@ class State {
 			try await endNight()
 			try await checkWin()
 			if state != .playing {
+				if let id = thread?.id {
+					_ = try await bot.modifyChannel(id, with: ["archived": true])
+				}
 				return
 			}
 
@@ -309,7 +335,7 @@ class State {
 
 			tickDay()
 
-			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "\(timeOfYear.name) of Year \(year) (Game Day \(day))"))
+			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Morning of \(timeOfYear.name) of Year \(year) (Game Day \(day))"))
 			_ = try await thread?.send("The villagers gather the next morning in the village center.")
 			_ = try await thread?.send("It is now day time. All of you have 50 seconds to make your accusations, defenses, or just talk.")
 
@@ -325,6 +351,9 @@ class State {
 
 			try await checkWin()
 			if state != .playing {
+				if let id = thread?.id {
+					_ = try await bot.modifyChannel(id, with: ["archived": true])
+				}
 				return
 			}
 		}
@@ -369,6 +398,8 @@ class State {
 		try await kill(who.key, because: .exile)
 		let name = roles[who.key]!.roleName
 		_ = try await thread?.send("<@\(who.key)> was a **\(name)**!")
+
+		self.votes = [:]
 	}
 
 	func startNight() async throws {
@@ -388,19 +419,31 @@ class State {
 				let seer = roles.filter { $0.value == .seer }[0]
 				_ = try await dm.send(EmbedBuilder.info.setDescription(description: "The Seer is <@\(seer.key)>"))
 			case .werewolf:
-				_ = try await dm.send(EmbedBuilder.good.setTitle(title: "Time to kill someone tonight!"))
-				let menu = SelectMenuBuilder(message: "Choose someone to kill")
-					.addComponent(component: userMenu(id: "werewolf-kill", users: Array(users.values).filter { $0.id != user }))
+				let menu: SelectMenuBuilder
+				if self.timeOfYear == .earlyWinter || self.timeOfYear == .lateWinter {
+					_ = try await dm.send(EmbedBuilder.good.setTitle(title: "Looks like it's winter! With your snow coat, it's time to freeze someone tonight! This will prevent them from performing any action today."))
+					menu = SelectMenuBuilder(message: "Choose someone to freeze")
+						.addComponent(component: userMenu(id: "werewolf-kill", users: Array(users.values).filter { $0.id != user }.filter { alive[$0.id]! }))
+				} else {
+					_ = try await dm.send(EmbedBuilder.good.setTitle(title: "Time to kill someone tonight!"))
+					menu = SelectMenuBuilder(message: "Choose someone to kill")
+						.addComponent(component: userMenu(id: "werewolf-kill", users: Array(users.values).filter { $0.id != user }.filter { alive[$0.id]! }))
+				}
 				actionMessages[user] = try await dm.send(menu)
 			case .guardianAngel:
 				_ = try await dm.send(EmbedBuilder.good.setTitle(title: "Time to protect someone tonight!"))
 				let menu = SelectMenuBuilder(message: "Choose someone to protect")
-					.addComponent(component: userMenu(id: "guardianAngel-protect", users: Array(users.values)))
+					.addComponent(component: userMenu(id: "guardianAngel-protect", users: Array(users.values).filter { alive[$0.id]! }))
 				actionMessages[user] = try await dm.send(menu)
 			case .seer:
 				_ = try await dm.send(EmbedBuilder.good.setTitle(title: "Time to see someone tonight!"))
 				let menu = SelectMenuBuilder(message: "Choose someone to see their role")
-					.addComponent(component: userMenu(id: "seer-investigate", users: Array(users.values).filter { $0.id != user }))
+					.addComponent(component: userMenu(id: "seer-investigate", users: Array(users.values).filter { $0.id != user }.filter { alive[$0.id]! }))
+				actionMessages[user] = try await dm.send(menu)
+			case .cookiePerson:
+				_ = try await dm.send(EmbedBuilder.good.setTitle(title: "Time to visit someone tonight!"))
+				let menu = SelectMenuBuilder(message: "Choose someone to visit them during the night and give them cookies")
+					.addComponent(component: userMenu(id: "cookies-give", users: Array(users.values).filter { $0.id != user }.filter { alive[$0.id]! }))
 				actionMessages[user] = try await dm.send(menu)
 			}
 		}
@@ -446,6 +489,10 @@ class State {
 		}
 		actionMessages = [:]
 		for action in actions {
+			if actions.values.contains(.freeze(who: action.key)) {
+				let dm = try await bot.getDM(for: action.key)
+				_ = try await dm?.send(EmbedBuilder.bad.setDescription(description: "A werewolf froze you, therefore you couldn't do anything tonight!"))
+			}
 			switch action.value {
 			case .check(let who):
 				let name = roles[who]!.roleName
@@ -456,6 +503,8 @@ class State {
 				try await Task.sleep(nanoseconds: 3_000_000_000)
 				if actions.contains(where: { $0.value == .protect(who: who)}) {
 					_ = try await thread?.send(EmbedBuilder.good.setDescription(description: "... but a Guardian Angel protects them!"))
+				} else if actions.contains(where: { $0.key == who && $0.value.awayFromHome }) {
+					_ = try await thread?.send(EmbedBuilder.good.setDescription(description: "... but they were away from home!"))
 				} else {
 					if Double.random(in: 0...1) > werewolfKillSuccessRate {
 						_ = try await thread?.send(EmbedBuilder.bad.setDescription(description: "... and succeed!"))
@@ -464,7 +513,32 @@ class State {
 						_ = try await thread?.send(EmbedBuilder.bad.setDescription(description: "... and fail!"))
 					}
 				}
-			case .protect(_):
+			case .giveCookies(let who):
+				if roles[who] == .werewolf {
+					_ = try await thread?.send(EmbedBuilder.bad.setDescription(description: "<@\(action.key)> decided to give cookies to a Werewolf, uh-oh..."))
+					try await Task.sleep(nanoseconds: 3_000_000_000)
+					if actions.contains(where: { $0.value == .protect(who: action.key)}) {
+						_ = try await thread?.send(EmbedBuilder.good.setDescription(description: "<@\(action.key)> was protected by a Guardian Angel!"))
+					} else {
+						_ = try await thread?.send(EmbedBuilder.bad.setDescription(description: "<@\(action.key)> got eaten!"))
+
+						try await kill(action.key, because: .werewolf)
+					}
+					break
+				}
+				if actions.contains(where: { $0.value == .kill(who: who) }) {
+					_ = try await thread?.send(EmbedBuilder.bad.setDescription(description: "<@\(action.key)> was visiting <@\(who)>, but unfortunately, the werewolves were visiting them too!"))
+					try await Task.sleep(nanoseconds: 3_000_000_000)
+					if actions.contains(where: { $0.value == .protect(who: action.key)}) {
+						_ = try await thread?.send(EmbedBuilder.good.setDescription(description: "The werewolves were going to have a bonus snack, but <@\(action.key)> was protected by a Guardian Angel!"))
+					} else {
+						_ = try await thread?.send(EmbedBuilder.bad.setDescription(description: "The werewolves had a tasty bonus snack! <@\(action.key)> got eaten by the werewolves!"))
+						try await kill(action.key, because: .werewolf)
+					}
+					break
+				}
+				_ = try await thread?.send(EmbedBuilder.good.setDescription(description: "<@\(action.key)> gave cookies to <@\(who)> last night. Yummy!"))
+			case .protect(_), .freeze(_):
 				continue
 			}
 			try await Task.sleep(nanoseconds: 2_000_000_000)
@@ -513,6 +587,19 @@ extension Message {
 	}
 }
 
+extension SlashCommandEvent {
+	func ensureState() async throws {
+		if !states.keys.contains(self.channelId) {
+			let chan = try await bot.getChannel(self.channelId)
+			states[self.channelId] = State(for: chan as! GuildText)
+		}
+	}
+	var state: State {
+
+		return states[self.self.channelId]!
+	}
+}
+
 extension EmbedBuilder {
 	static var good: EmbedBuilder {
 		EmbedBuilder()
@@ -528,67 +615,92 @@ extension EmbedBuilder {
 	}
 }
 
+let commands = [
+	try! SlashCommandBuilder(name: "join", description: "Join a lobby"),
+	try! SlashCommandBuilder(name: "leave", description: "Leave a lobby"),
+	try! SlashCommandBuilder(name: "party", description: "View the current party"),
+	try! SlashCommandBuilder(name: "setup", description: "Set up a game, making it ready to play"),
+	try! SlashCommandBuilder(name: "unsetup", description: "Un-set up a game, making it not ready to play, allowing people to leave"),
+	try! SlashCommandBuilder(name: "start", description: "Start a game"),
+]
+
 class MyBot: ListenerAdapter {
-	func messageCreate(event: Message) async throws {
-		guard let author = event.author else {
-			return
-		}
-		switch event.content {
-		case "m!join", "m!jion":
+	func slashCommandEvent(event: SlashCommandEvent) async throws {
+		try await event.ensureState()
+
+		let author = event.user
+
+		switch event.name {
+		case "join":
 			guard !currentlyIn.keys.contains(author.id) else {
-				_ = try await event.reply(with: "You can't join this game, because you're already playing a game in <#\(currentlyIn[author.id]!.channel.id)>!")
+				_ = try await event.reply(message: "You can't join this game, because you're already playing a game in <#\(currentlyIn[author.id]!.channel.id)>!")
 				return
 			}
 			guard event.state.state == .waiting || event.state.state == .assigned else {
-				_ = try await event.reply(with: "A game is in progress! Try joining again, when it's over.")
+				_ = try await event.reply(message: "A game is in progress! Try joining again, when it's over.")
 				return
 			}
 			event.state.party.insert(author.id)
 			event.state.users[author.id] = author
 			currentlyIn[author.id] = event.state
-			_ = try await event.reply(with:
+			_ = try await event.replyEmbeds(embeds:
 				EmbedBuilder.good
 					.setTitle(title: "You have joined the party!")
 			)
 			if event.state.state == .assigned {
 				event.state.state = .waiting
-				_ = try await event.reply(with: "You need to m!setup again, since a new player joined!")
+				_ = try await event.reply(message: "You need to m!setup again, since a new player joined!")
 			}
-		case "m!leave":
+		case "leave":
 			guard event.state.state == .waiting else {
-				_ = try await event.reply(with: "You can't leave an in-progress game!")
+				_ = try await event.reply(message: "You can't leave an in-progress game!")
 				return
 			}
 			event.state.party.remove(author.id)
 			event.state.users.removeValue(forKey: author.id)
 			currentlyIn.removeValue(forKey: author.id)
-			_ = try await event.reply(with: 
+			_ = try await event.replyEmbeds(embeds:
 				EmbedBuilder.good
 					.setTitle(title: "You have left the party!")
 			)
-		case "m!party":
-			_ = try await event.reply(with:
+		case "party":
+			_ = try await event.replyEmbeds(embeds:
 				EmbedBuilder.info
 					.setTitle(title: "Your Party")
 					.setDescription(description: event.state.party.map { "<@\($0)>" }.joined(separator: "\n"))
 			)
-		case "m!setup":
+		case "setup":
 			guard event.state.state == .waiting || event.state.state == .assigned else {
-				_ = try await event.reply(with: "A game is already in progress!")
+				_ = try await event.reply(message: "A game is already in progress!")
+				return
+			}
+			guard event.state.party.count >= 4 else {
+				_ = try await event.reply(message: "You need at least 4 people to start playing!")
 				return
 			}
 			try await event.state.assignRoles()
-			_ = try await event.reply(with:
+			_ = try await event.replyEmbeds(embeds:
 				EmbedBuilder.info
 					.setTitle(title: "You're all set to go! Do !start to begin playing!")
 			)
-		case "m!start":
+		case "unsetup":
+			guard event.state.state == .assigned else {
+				_ = try await event.reply(message: "The lobby isn't in the right state for that!")
+				return
+			}
+
+			event.state.state = .waiting
+			_ = try await event.replyEmbeds(embeds:
+				EmbedBuilder.info
+					.setTitle(title: "The game has been un set up!")
+			)
+		case "start":
 			guard event.state.state != .playing else {
-				_ = try await event.reply(with: "A game is already in progress!")
+				_ = try await event.reply(message: "A game is already in progress!")
 				return
 			}
 			guard event.state.state == .assigned else {
-				_ = try await event.reply(with: "You need to !setup before you can !start")
+				_ = try await event.reply(message: "You need to !setup before you can !start")
 				return
 			}
 			try await event.state.startPlaying()
@@ -596,11 +708,15 @@ class MyBot: ListenerAdapter {
 			return
 		}
 	}
-	override func onMessageCreate(event: Message) async {
+	override func onSlashCommandEvent(event: SlashCommandEvent) async {
 		do {
-			try await messageCreate(event: event)
+			try await slashCommandEvent(event: event)
 		} catch {
-			_ = try? await event.reply(with: "Oops, I had an error: \(error)")
+			guard let channel = try? await bot.getChannel(event.channelId) as? TextChannel else {
+				print("error! \(error)")
+				return
+			}
+			_ = try? await channel.send("Oops, I had an error: \(error)")
 		}
 	}
 	func selectMenuEvent(event: SelectMenuEvent) async throws {
@@ -623,8 +739,13 @@ class MyBot: ListenerAdapter {
 				try await event.reply(message: "You aren't werewolf!")
 				return
 			}
-			try await event.reply(message: "You're going to kill <@\(event.selectedValue.value)> tonight!")
-			state.actions[event.user.id] = .kill(who: target)
+			if state.timeOfYear == .earlyWinter || state.timeOfYear == .lateWinter {
+				try await event.reply(message: "You're going to freeze <@\(event.selectedValue.value)> tonight!")
+				state.actions[event.user.id] = .freeze(who: target)
+			} else {
+				try await event.reply(message: "You're going to kill <@\(event.selectedValue.value)> tonight!")
+				state.actions[event.user.id] = .kill(who: target)
+			}
 		case "guardianAngel-protect":
 			guard state.roles[event.user.id] == .guardianAngel else {
 				try await event.reply(message: "You aren't guardianAngel!")
@@ -639,10 +760,22 @@ class MyBot: ListenerAdapter {
 			}
 			try await event.reply(message: "You're going to investigate <@\(event.selectedValue.value)> tonight!")
 			state.actions[event.user.id] = .check(who: target)
+		case "cookies-give":
+			guard state.roles[event.user.id] == .cookiePerson else {
+				try await event.reply(message: "You aren't a cookie person!")
+				return
+			}
+			try await event.reply(message: "You're going to give cookies to <@\(event.selectedValue.value)> tonight!")
+			state.actions[event.user.id] = .giveCookies(to: target)
 		case "vote":
 			guard state.alive[event.user.id] == true else {
 				event.setEphemeral(true)
 				try await event.reply(message: "You aren't alive to vote!")
+				return
+			}
+			guard event.user.id != target else {
+				event.setEphemeral(true)
+				try await event.reply(message: "You can't vote for yourself!")
 				return
 			}
 			if state.votes.keys.contains(event.user.id) {

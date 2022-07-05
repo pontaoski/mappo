@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "async-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/vapor/async-kit.git",
+      "state" : {
+        "revision" : "c3329e444bafbb12d1d312af9191be95348a8175",
+        "version" : "1.13.0"
+      }
+    },
+    {
       "identity" : "mimetype",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/SketchMaster2001/MimeType.git",

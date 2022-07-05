@@ -43,9 +43,7 @@ enum Role {
 	}
 	var minimumPlayerCount: Int {
 		switch self {
-		case .jester:
-			return 7
-		case .beholder, .cookiePerson:
+		case .beholder, .cookiePerson, .jester:
 			return 5
 		default:
 			return 0
@@ -313,6 +311,19 @@ class State {
 		_ = try await thread?.send("\(partyPings), get over here!")
 		_ = try await Task.sleep(nanoseconds: 5_000_000_000)
 
+		for user in party {
+			let dm = try await bot.getDM(for: user)
+			switch roles[user]! {
+			case .jester:
+				_ = try await dm?.send(EmbedBuilder.info.setTitle(title: "Remember: get yourself exiled!"))
+			case .beholder:
+				let seer = roles.filter { $0.value == .seer }[0]
+				_ = try await dm?.send(EmbedBuilder.info.setDescription(description: "The Seer is <@\(seer.key)>"))
+			default:
+				break
+			}
+		}
+
 		while state == .playing {
 			_ = try await thread?.send("Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!")
 
@@ -411,13 +422,8 @@ class State {
 				continue
 			}
 			switch roles[user]! {
-			case .villager:
-				_ = try await dm.send(EmbedBuilder.info.setTitle(title: "Looks like there's nothing to do tonight..."))
-			case .jester:
-				_ = try await dm.send(EmbedBuilder.info.setTitle(title: "Remember: get yourself exiled!"))
-			case .beholder:
-				let seer = roles.filter { $0.value == .seer }[0]
-				_ = try await dm.send(EmbedBuilder.info.setDescription(description: "The Seer is <@\(seer.key)>"))
+			case .villager, .jester, .beholder:
+				break
 			case .werewolf:
 				let menu: SelectMenuBuilder
 				if self.timeOfYear == .earlyWinter || self.timeOfYear == .lateWinter {
@@ -537,7 +543,6 @@ class State {
 					}
 					break
 				}
-				_ = try await thread?.send(EmbedBuilder.good.setDescription(description: "<@\(action.key)> gave cookies to <@\(who)> last night. Yummy!"))
 			case .protect(_), .freeze(_):
 				continue
 			}

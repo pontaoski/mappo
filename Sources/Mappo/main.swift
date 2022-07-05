@@ -17,6 +17,16 @@ enum Role {
 	case beholder
 	case jester
 	case cookiePerson
+	case furry
+
+	func appearsAs(to: Role) -> Role {
+		switch (self, to) {
+		case (.furry, .seer):
+			return .werewolf
+		default:
+			return self
+		}
+	}
 
 	func isValid(with roles: [Role], playerCount count: Int) -> Bool {
 		guard roles.filter({ $0 == self }).count < self.absoluteMax else {
@@ -65,6 +75,8 @@ enum Role {
 			return "Jester"
 		case .cookiePerson:
 			return "Cookie Person"
+		case .furry:
+			return "Furry"
 		}
 	}
 	var roleDescription: String {
@@ -83,11 +95,13 @@ enum Role {
 			return "You have one goal: get the village to exile you."
 		case .cookiePerson:
 			return "Every night, you can choose to visit someone and give them cookies. If you visit a wolf, you will be killed. However, if you're visiting someone and the wolves try to kill you, you'll survive! (because you weren't home). If the wolves kill someone you're visiting, they'll kill you as well."
+		case .furry:
+			return "You love to cosplay as a wolf! The problem is, the seer doesn't know what's up with these newfangled youths, and assumes you are a wolf. Oops."
 		}
 	}
 
 	static let good: [Role] = [.guardianAngel, .seer, .beholder]
-	static let neutral: [Role] = [.villager, .jester, .cookiePerson]
+	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry]
 	static let evil: [Role] = [.werewolf]
 }
 
@@ -422,7 +436,7 @@ class State {
 				continue
 			}
 			switch roles[user]! {
-			case .villager, .jester, .beholder:
+			case .villager, .jester, .beholder, .furry:
 				break
 			case .werewolf:
 				let menu: SelectMenuBuilder
@@ -501,7 +515,7 @@ class State {
 			}
 			switch action.value {
 			case .check(let who):
-				let name = roles[who]!.roleName
+				let name = roles[who]!.appearsAs(to: .seer).roleName
 				let dm = try await bot.getDM(for: action.key)
 				_ = try await dm?.send(EmbedBuilder.bad.setDescription(description: "<@\(who.rawValue)> is a \(name)!"))
 			case .kill(let who):

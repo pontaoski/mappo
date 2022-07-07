@@ -1,10 +1,35 @@
 import Swiftcord
 import NIO
+import NIOCore
 import Foundation
 import AsyncKit
 
 struct Config: Codable {
 	var token: String
+}
+
+class ConditionVariable {
+	let promise: EventLoopPromise<Void>
+	let future: EventLoopFuture<Void>
+	var done = false
+
+	init(for eventLoop: EventLoop) {
+		promise = eventLoop.makePromise(of: Void.self)
+		future = promise.futureResult
+	}
+	deinit {
+		if !done {
+			promise.succeed(())
+		}
+	}
+
+	func release() {
+		promise.succeed(())
+		done = true
+	}
+	func wait() async throws {
+		try await future.get()
+	}
 }
 
 let config = try! JSONDecoder().decode(Config.self,  from: try! String(contentsOfFile: "config.json").data(using: .utf8)!)
@@ -263,6 +288,17 @@ class State {
 	// who's playing?
 	var party: Set<Snowflake> = []
 
+	// who's ready to nominate?
+	// player -> nominate or skip
+	var readyToNominate: [Snowflake: Bool] = [:]
+
+	// who's been nominated:
+	var nominees: Set<Snowflake> = []
+
+	var nominationCondition: ConditionVariable
+
+	var eventLoop: EventLoop
+
 	// what actions have been done tonight, and by who
 	var actions: [Snowflake: Action] = [:]
 
@@ -272,8 +308,8 @@ class State {
 	// who's alive?
 	var alive: [Snowflake: Bool] = [:]
 
-	// who's voting for who?
-	var votes: [Snowflake: Snowflake] = [:]
+	// who's voting yay/nay
+	var votes: [Snowflake: Bool] = [:]
 
 	var state: GameState = .waiting
 
@@ -287,11 +323,18 @@ class State {
 
 	var leaveQueue: Set<Snowflake> = []
 
-	init(for channel: TextChannel) {
+	init(for channel: TextChannel, eventLoop: EventLoop) {
 		self.channel = channel
 		self.day = 1
 		self.year = 1
 		self.timeOfYear = .possible.randomElement()!
+		self.nominationCondition = .init(for: eventLoop)
+		self.eventLoop = eventLoop
+		self.nominees = []
+	}
+
+	func resetNominationCondition() {
+		self.nominationCondition = .init(for: self.eventLoop)
 	}
 
 	func clear() {
@@ -302,8 +345,9 @@ class State {
 		self.actionMessages = [:]
 		self.roles = [:]
 		self.teams = [:]
-		self.votes = [:]
 		self.alive = [:]
+		self.nominees = []
+		self.votes = [:]
 	}
 
 	func eligible(_ against: [Role]) -> [Role] {
@@ -446,17 +490,58 @@ class State {
 
 			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Morning of \(timeOfYear.name) of Year \(year) (Game Day \(day))"))
 			_ = try await thread?.send("The villagers gather the next morning in the village center.")
-			_ = try await thread?.send("It is now day time. All of you have 50 seconds to make your accusations, defenses, or just talk.")
+			_ = try await thread?.send("It is now day time. All of you have at least 30 seconds to make your accusations, defenses, claim roles, or just talk.")
 
-			try await Task.sleep(nanoseconds: 50_000_000_000)
-
-			_ = try await thread?.send("Dusk draws near, and the villagers gather to decide who they are exiling this evening...")
-			_ = try await thread?.send("Everyone has 30 seconds to vote!")
-
-			// talk & vote time
-			try await announceVote()
 			try await Task.sleep(nanoseconds: 30_000_000_000)
-			try await concludeVote()
+
+			resetNominationCondition()
+			_ = try await thread?.send("Evening draws near, and it's now possible to start or skip nominations. Nominations will start or be skipped once a majority of people have indicated to do so.")
+			_ = try await thread?.send(ButtonBuilder().addComponent(component:
+				.init(components: Button(customId: "nominate-yes", style: .blurple, label: "Nominate Someone"),
+								Button(customId: "nominate-no", style: .grey, label: "Don't Nominate Someone"))))
+
+			try await nominationCondition.wait()
+			if readyToNominate.values.filter({ $0 }).count > readyToNominate.values.filter({ !$0 }).count {
+				_ = try await thread?.send("Dusk draws near, and the villagers gather to decide who they are nominating this evening...")
+				_ = try await thread?.send("Everyone has 30 seconds to nominate someone!")
+
+				let possible = users.values.filter { alive[$0.id]! }
+				let menu = SelectMenuBuilder(message: "Nominate people (or don't)!").addComponent(component: userMenu(id: "nominate", users: possible))
+				_ = try await thread?.send(menu)
+
+				try await Task.sleep(nanoseconds: 30_000_000_000)
+
+				if nominees.count == 0 {
+					_ = try await thread?.send("Oops, doesn't look like there's any nominees tonight...")
+				} else {
+					_ = try await thread?.send("Let's go through all of the nominations! We have \(nominees.count) of them tonight. We'll stop if and when we vote someone out.")
+					for nominee in nominees {
+						self.votes = [:]
+						_ = try await thread?.send(ButtonBuilder(message: "Are we voting out <@\(nominee)> tonight? You have 30 seconds to vote.").addComponent(component: .init(components:
+							Button(customId: "vote-yes", style: .green, label: "Yes"),
+							Button(customId: "vote-no", style: .red, label: "No")
+						)))
+						_ = try await Task.sleep(nanoseconds: 30_000_000_000)
+						if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
+							_ = try await thread?.send("Looks like we're exiling <@\(nominee)> tonight! Bye-bye!")
+							_ = try await attemptKill(nominee, because: .exile)
+							break
+						} else {
+							_ = try await thread?.send("Looks like we're not exiling <@\(nominee)> tonight!")
+						}
+					}
+					if state != .playing {
+						try await endGameCleanup()
+						return
+					}
+					_ = try await thread?.send("Dusk draws near, and it's time to get to bed... A little more discussion time (25 seconds) for you before that, though!")
+					try await Task.sleep(nanoseconds: 25_000_000_000)
+				}
+			} else {
+				_ = try await thread?.send("Dusk draws near, and it looks like nobody's getting nominated tonight...")
+				try await Task.sleep(nanoseconds: 3_000_000_000)
+			}
+
 			if state != .playing {
 				try await endGameCleanup()
 				return
@@ -476,37 +561,6 @@ class State {
 			}
 			.joined(separator: "\n")
 		_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Alive").setDescription(description: txt))
-	}
-
-	func announceVote() async throws {
-		let possible = users.values.filter { alive[$0.id]! }
-		let menu = SelectMenuBuilder(message: "Vote on who to exile!")
-			.addComponent(component: userMenu(id: "vote", users: possible))
-		_ = try await thread?.send(menu)
-	}
-
-	func concludeVote() async throws {
-		defer {
-			self.votes = [:]
-		}
-
-		if votes.count == 0 {
-			_ = try await thread?.send("Nobody was voted out... sad...")
-			return
-		}
-
-		var count: [Snowflake: Int] = [:]
-		votes.forEach { count[$0.value] = (count[$0.value] ?? 0) + 1 }
-
-		let who = count.sorted(by: { $0.value > $1.value })[0]
-		guard who.value >= 2 else {
-			_ = try await thread?.send("Nobody was voted out... sad...")
-			return
-		}
-		_ = try await thread?.send("The villagers have cast their votes, amid doubts and suspicions. <@\(who.key)> is exiled.")
-		try await attemptKill(who.key, because: .exile)
-		let name = roles[who.key]!.roleName
-		_ = try await thread?.send("<@\(who.key)> was a **\(name)**!")
 	}
 
 	func startNight() async throws {
@@ -730,7 +784,7 @@ var states: [Snowflake: State] = [:]
 extension Message {
 	var state: State {
 		if !states.keys.contains(self.channel.id) {
-			states[self.channel.id] = State(for: self.channel)
+			states[self.channel.id] = State(for: self.channel, eventLoop: evGroup.next())
 		}
 
 		return states[self.channel.id]!
@@ -741,11 +795,10 @@ extension SlashCommandEvent {
 	func ensureState() async throws {
 		if !states.keys.contains(self.channelId) {
 			let chan = try await bot.getChannel(self.channelId)
-			states[self.channelId] = State(for: chan as! GuildText)
+			states[self.channelId] = State(for: chan as! GuildText, eventLoop: evGroup.next())
 		}
 	}
 	var state: State {
-
 		return states[self.self.channelId]!
 	}
 }
@@ -943,23 +996,19 @@ class MyBot: ListenerAdapter {
 			}
 			try await event.reply(message: "You're going to give cookies to <@\(event.selectedValue.value)> tonight!")
 			state.actions[event.user.id] = .giveCookies(to: target)
-		case "vote":
+		case "nominate":
 			event.setEphemeral(true)
 			guard state.alive[event.user.id] == true else {
-				try await event.reply(message: "You aren't alive to vote!")
+				try await event.reply(message: "You aren't alive to nominate!")
 				return
 			}
-			guard state.votes[event.user.id] != target else {
-				try await event.reply(message: "That's already your vote!")
-				return
-			}
-			if state.votes.keys.contains(event.user.id) {
-				_ = try await state.thread?.send("<@\(event.user.id)> has decided to to exile <@\(target)> instead!")
+			if state.nominees.contains(target) {
+				_ = try await event.reply(message: "That person has already been nominated!")
 			} else {
-				_ = try await state.thread?.send("<@\(event.user.id)> has voted to exile <@\(target)>!")
+				_ = try await event.reply(message: "You've successfully nominated <@\(target)>!")
+				state.nominees.insert(target)
+				_ = try await state.thread?.send("<@\(event.user.id)> has nominated <@\(target)>!")
 			}
-			state.votes[event.user.id] = target
-			try await event.reply(message: "Your vote has been submitted!")
 		default:
 			event.setEphemeral(true)
 			try await event.reply(message: "Oops, I don't understand what you just did. Sorry.")
@@ -968,6 +1017,57 @@ class MyBot: ListenerAdapter {
 	override func onSelectMenuEvent(event: SelectMenuEvent) async {
 		do {
 			try await selectMenuEvent(event: event)
+		} catch {
+			_ = try? await event.reply(message: "Oops, I had an error: \(error)")
+		}
+	}
+	func buttonClickEvent(event: ButtonEvent) async throws {
+		guard let state = currentlyIn[event.user.id] else {
+			event.setEphemeral(true)
+			try await event.reply(message: "Oops, it doesn't look like you're in a game...")
+			return
+		}
+
+		switch event.selectedButton.customId {
+		case "nominate-yes":
+			_ = try? await event.reply(message: "<@\(event.user.id)> wants someone to be nominated tonight!")
+			state.readyToNominate[event.user.id] = true
+			if state.readyToNominate.count >= state.party.count/2 {
+				state.nominationCondition.release()
+			}
+			break
+		case "nominate-no":
+			_ = try? await event.reply(message: "<@\(event.user.id)> doesn't want someone to be nominated tonight!")
+			state.readyToNominate[event.user.id] = false
+			if state.readyToNominate.count >= state.party.count/2 {
+				state.nominationCondition.release()
+			}
+			break
+		case "vote-yes":
+			guard state.alive[event.user.id] == true else {
+				try await event.reply(message: "You aren't alive to vote!")
+				return
+			}
+			state.votes[event.user.id] = true
+			event.setEphemeral(true)
+			_ = try await event.reply(message: "Your vote has been submitted!")
+			_ = try await state.thread?.send("<@\(event.user.id)> has voted yes!")
+		case "vote-no":
+			guard state.alive[event.user.id] == true else {
+				try await event.reply(message: "You aren't alive to vote!")
+				return
+			}
+			state.votes[event.user.id] = false
+			event.setEphemeral(true)
+			_ = try await event.reply(message: "Your vote has been submitted!")
+			_ = try await state.thread?.send("<@\(event.user.id)> has voted no!")
+		default:
+			_ = try? await event.reply(message: "Oops, I don't understand which button you pressed...")
+		}
+	}
+	override func onButtonClickEvent(event: ButtonEvent) async {
+		do {
+			try await buttonClickEvent(event: event)
 		} catch {
 			_ = try? await event.reply(message: "Oops, I had an error: \(error)")
 		}

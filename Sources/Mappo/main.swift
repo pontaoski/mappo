@@ -269,6 +269,8 @@ extension Collection where Self.Element: Comparable {
 // user -> state
 var currentlyIn: [Snowflake: State] = [:]
 
+struct GameEnded: Error {}
+
 class State {
 	// user -> role
 	var roles: [Snowflake: Role] = [:]
@@ -446,6 +448,75 @@ class State {
 		leaveQueue = []
 	}
 
+	func playNight() async throws {
+		_ = try await thread?.send("Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!")
+
+		// night actions
+		_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Night of \(timeOfYear.name) of Year \(year) (Game Day \(day))"))
+		try await startNight()
+		try await Task.sleep(nanoseconds: 35_000_000_000)
+
+		// finish up night actions
+		try await endNight()
+		try await nightStatus()
+
+		tickDay()
+
+		_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Morning of \(timeOfYear.name) of Year \(year) (Game Day \(day))"))
+		_ = try await thread?.send("The villagers gather the next morning in the village center.")
+		_ = try await thread?.send("It is now day time. All of you have at least 30 seconds to make your accusations, defenses, claim roles, or just talk.")
+
+		try await Task.sleep(nanoseconds: 30_000_000_000)
+
+		resetNominationCondition()
+		_ = try await thread?.send("Evening draws near, and it's now possible to start or skip nominations. Nominations will start or be skipped once a majority of people have indicated to do so.")
+		_ = try await thread?.send(ButtonBuilder().addComponent(component:
+			.init(components: Button(customId: "nominate-yes", style: .blurple, label: "Nominate Someone"),
+							Button(customId: "nominate-no", style: .grey, label: "Don't Nominate Someone"))))
+
+		try await nominationCondition.wait()
+		if readyToNominate.values.filter({ $0 }).count < readyToNominate.values.filter({ !$0 }).count {
+			_ = try await thread?.send("Dusk draws near, and it looks like nobody's getting nominated tonight...")
+			try await Task.sleep(nanoseconds: 3_000_000_000)
+			return
+		}
+
+		_ = try await thread?.send("Dusk draws near, and the villagers gather to decide who they are nominating this evening...")
+		_ = try await thread?.send("Everyone has 30 seconds to nominate someone!")
+
+		let possible = users.values.filter { alive[$0.id]! }
+		let menu = SelectMenuBuilder(message: "Nominate people (or don't)!").addComponent(component: userMenu(id: "nominate", users: possible))
+		_ = try await thread?.send(menu)
+
+		try await Task.sleep(nanoseconds: 30_000_000_000)
+
+		if nominees.count == 0 {
+			_ = try await thread?.send("Oops, doesn't look like there's any nominees tonight... Off to bed it is, then.")
+			try await Task.sleep(nanoseconds: 3_000_000_000)
+			return
+		}
+
+		_ = try await thread?.send("Let's go through all of the nominations! We have \(nominees.count) of them tonight. We'll stop if and when we vote someone out.")
+		for nominee in nominees {
+			self.votes = [:]
+			_ = try await thread?.send(ButtonBuilder(message: "Are we voting out <@\(nominee)> tonight? You have 30 seconds to vote.").addComponent(component: .init(components:
+				Button(customId: "vote-yes", style: .green, label: "Yes"),
+				Button(customId: "vote-no", style: .red, label: "No")
+			)))
+			_ = try await Task.sleep(nanoseconds: 30_000_000_000)
+			if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
+				_ = try await thread?.send("Looks like we're exiling <@\(nominee)> tonight! Bye-bye!")
+				_ = try await attemptKill(nominee, because: .exile)
+				break
+			} else {
+				_ = try await thread?.send("Looks like we're not exiling <@\(nominee)> tonight!")
+			}
+		}
+
+		_ = try await thread?.send("Dusk draws near, and it's time to get to bed... A little more discussion time (25 seconds) for you before that, though!")
+		try await Task.sleep(nanoseconds: 25_000_000_000)
+	}
+
 	func startPlaying() async throws {
 		state = .playing
 
@@ -470,81 +541,10 @@ class State {
 		}
 
 		while state == .playing {
-			_ = try await thread?.send("Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!")
-
-			// night actions
-			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Night of \(timeOfYear.name) of Year \(year) (Game Day \(day))"))
-			try await startNight()
-			try await Task.sleep(nanoseconds: 35_000_000_000)
-
-			// finish up night actions
-			try await endNight()
-			if state != .playing {
+			do {
+				try await playNight()
+			} catch is GameEnded {
 				try await endGameCleanup()
-				return
-			}
-
-			try await nightStatus()
-
-			tickDay()
-
-			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Morning of \(timeOfYear.name) of Year \(year) (Game Day \(day))"))
-			_ = try await thread?.send("The villagers gather the next morning in the village center.")
-			_ = try await thread?.send("It is now day time. All of you have at least 30 seconds to make your accusations, defenses, claim roles, or just talk.")
-
-			try await Task.sleep(nanoseconds: 30_000_000_000)
-
-			resetNominationCondition()
-			_ = try await thread?.send("Evening draws near, and it's now possible to start or skip nominations. Nominations will start or be skipped once a majority of people have indicated to do so.")
-			_ = try await thread?.send(ButtonBuilder().addComponent(component:
-				.init(components: Button(customId: "nominate-yes", style: .blurple, label: "Nominate Someone"),
-								Button(customId: "nominate-no", style: .grey, label: "Don't Nominate Someone"))))
-
-			try await nominationCondition.wait()
-			if readyToNominate.values.filter({ $0 }).count > readyToNominate.values.filter({ !$0 }).count {
-				_ = try await thread?.send("Dusk draws near, and the villagers gather to decide who they are nominating this evening...")
-				_ = try await thread?.send("Everyone has 30 seconds to nominate someone!")
-
-				let possible = users.values.filter { alive[$0.id]! }
-				let menu = SelectMenuBuilder(message: "Nominate people (or don't)!").addComponent(component: userMenu(id: "nominate", users: possible))
-				_ = try await thread?.send(menu)
-
-				try await Task.sleep(nanoseconds: 30_000_000_000)
-
-				if nominees.count == 0 {
-					_ = try await thread?.send("Oops, doesn't look like there's any nominees tonight...")
-				} else {
-					_ = try await thread?.send("Let's go through all of the nominations! We have \(nominees.count) of them tonight. We'll stop if and when we vote someone out.")
-					for nominee in nominees {
-						self.votes = [:]
-						_ = try await thread?.send(ButtonBuilder(message: "Are we voting out <@\(nominee)> tonight? You have 30 seconds to vote.").addComponent(component: .init(components:
-							Button(customId: "vote-yes", style: .green, label: "Yes"),
-							Button(customId: "vote-no", style: .red, label: "No")
-						)))
-						_ = try await Task.sleep(nanoseconds: 30_000_000_000)
-						if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
-							_ = try await thread?.send("Looks like we're exiling <@\(nominee)> tonight! Bye-bye!")
-							_ = try await attemptKill(nominee, because: .exile)
-							break
-						} else {
-							_ = try await thread?.send("Looks like we're not exiling <@\(nominee)> tonight!")
-						}
-					}
-					if state != .playing {
-						try await endGameCleanup()
-						return
-					}
-					_ = try await thread?.send("Dusk draws near, and it's time to get to bed... A little more discussion time (25 seconds) for you before that, though!")
-					try await Task.sleep(nanoseconds: 25_000_000_000)
-				}
-			} else {
-				_ = try await thread?.send("Dusk draws near, and it looks like nobody's getting nominated tonight...")
-				try await Task.sleep(nanoseconds: 3_000_000_000)
-			}
-
-			if state != .playing {
-				try await endGameCleanup()
-				return
 			}
 		}
 	}
@@ -775,6 +775,8 @@ class State {
 			}
 			.joined(separator: "\n")
 		_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Players").setDescription(description: txt))
+
+		throw GameEnded()
 	}
 }
 
@@ -893,7 +895,7 @@ class MyBot: ListenerAdapter {
 				_ = try await event.reply(message: "A game is already in progress!")
 				return
 			}
-			guard event.state.party.count >= 4 else {
+			guard event.state.party.count >= 1 else {
 				_ = try await event.reply(message: "You need at least 4 people to start playing!")
 				return
 			}

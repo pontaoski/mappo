@@ -506,6 +506,10 @@ class State {
 				_ = try await thread?.send(menu)
 
 				try await Task.sleep(nanoseconds: 30_000_000_000)
+
+				if nominees.count == 0 {
+					
+				}
 			} else {
 				_ = try await thread?.send("Dusk draws near, and it looks like nobody's getting nominated tonight...")
 				try await Task.sleep(nanoseconds: 3_000_000_000)

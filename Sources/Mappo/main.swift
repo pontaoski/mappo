@@ -43,6 +43,17 @@ enum Role {
 		return true
 	}
 
+	var defaultTeam: Team {
+		switch self {
+			case .jester:
+				return .jester
+			case .werewolf:
+				return .werewolf
+			default:
+				return .village
+		}
+	}
+
 	var absoluteMax: Int {
 		switch self {
 		case .guardianAngel, .seer, .beholder, .jester, .cookiePerson:
@@ -105,6 +116,12 @@ enum Role {
 	static let evil: [Role] = [.werewolf]
 }
 
+enum Team: Equatable {
+	case village
+	case werewolf
+	case jester
+}
+
 enum Action: Equatable {
 	case kill(who: Snowflake)
 	case freeze(who: Snowflake)
@@ -138,7 +155,7 @@ enum GameState {
 	case playing
 }
 
-enum DeathReason {
+enum DeathReason: Equatable {
 	case werewolf
 	case exile
 	case visitedWerewolf
@@ -214,6 +231,9 @@ class State {
 	// user -> role
 	var roles: [Snowflake: Role] = [:]
 
+	// user -> team
+	var teams: [Snowflake: Team] = [:]
+
 	// id -> user
 	var users: [Snowflake: User] = [:]
 
@@ -264,6 +284,7 @@ class State {
 		self.actions = [:]
 		self.actionMessages = [:]
 		self.roles = [:]
+		self.teams = [:]
 		self.votes = [:]
 		self.alive = [:]
 	}
@@ -307,6 +328,10 @@ class State {
 		let neutral = max(shuffle.count - (evil + good), 0)
 		shuffle.suffix(neutral).forEach {
 			roles[$0] = eligible(Role.neutral).randomElement()!
+		}
+
+		party.forEach {
+			teams[$0] = roles[$0]?.defaultTeam
 		}
 
 		for user in shuffle {
@@ -393,7 +418,6 @@ class State {
 
 			// finish up night actions
 			try await endNight()
-			try await checkWin()
 			if state != .playing {
 				try await endGameCleanup()
 				return
@@ -416,8 +440,6 @@ class State {
 			try await announceVote()
 			try await Task.sleep(nanoseconds: 30_000_000_000)
 			try await concludeVote()
-
-			try await checkWin()
 			if state != .playing {
 				try await endGameCleanup()
 				return
@@ -592,12 +614,6 @@ class State {
 			}
 			break
 		case .exile:
-			if roles[who] == .jester {
-				state = .waiting
-				try await checkWin()
-				_ = try await thread?.send("<@\(who)> was the Jester! They win!")
-				return
-			}
 			try await kill(who, because: why)
 		case .protectedWerewolf:
 			if Double.random(in: 0...1) > 0.5 {
@@ -606,6 +622,7 @@ class State {
 				try await kill(who, because: .protectedWerewolf)
 			}
 		}
+		try await handlePossibleWin(whoDied: who, why: why)
 	}
 
 	func endNight() async throws {
@@ -644,31 +661,39 @@ class State {
 		actions = [:]
 	}
 
-	func checkWin() async throws {
-		let aliveEvil = roles.filter { roles[$0.key] == .werewolf }
+	func checkWin(whoDied: Snowflake, why: DeathReason) -> Optional<(String, Team)> {
+		let werewolvesAlive = roles.filter { teams[$0.key] == .werewolf }
 			.filter { alive[$0.key] == true }
-		let aliveNotEvil = roles.filter { roles[$0.key] != .werewolf }
+		let nonWerewolvesAlive = roles.filter { teams[$0.key] != .werewolf }
 			.filter { alive[$0.key] == true }
 
-		if aliveEvil.count == 0 {
-			_ = try await thread?.send(EmbedBuilder.good.setTitle(title: "The villagers win!"))
-			state = .waiting
-		} else if aliveEvil.count >= aliveNotEvil.count {
-			_ = try await thread?.send(EmbedBuilder.bad.setTitle(title: "The werewolves win!"))
-			state = .waiting
+		if werewolvesAlive.count == 0 {
+			return ("The villagers win!", .village)
+		} else if werewolvesAlive.count >= nonWerewolvesAlive.count {
+			return ("The werewolves win!", .werewolf)
 		}
 
-		if state == .waiting {
-			let txt = users.values
-				.map { item -> String in
-					let role = roles[item.id]!
-					let alive = alive[item.id]! ? ":white_check_mark:" : ":x:"
-					return "\(alive) <@\(item.id)> (was a \(role.roleName))"
-				}
-				.joined(separator: "\n")
-			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Players").setDescription(description: txt))
-			clear()
+		if roles[whoDied] == .jester && why == .exile {
+			return ("The jester wins because they got exiled!", .jester)
 		}
+
+		return nil
+	}
+
+	func handlePossibleWin(whoDied: Snowflake, why: DeathReason) async throws {
+		let (message, winners) = checkWin(whoDied: whoDied, why: why)!;
+		_ = try await thread?.send(message)
+		state = .waiting
+		let txt = users.values
+			.map { item -> String in
+				let role = roles[item.id]!
+				let alive = alive[item.id]! ? ":heart:" : ":broken_heart:"
+				let won = teams[item.id] == winners ? ":white_check_mark:" : ":x:"
+				return "\(won)\(alive) <@\(item.id)> (was a \(role.roleName))"
+			}
+			.joined(separator: "\n")
+		_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Players").setDescription(description: txt))
+		clear()
 	}
 }
 

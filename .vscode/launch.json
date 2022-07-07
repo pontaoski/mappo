@@ -1,0 +1,22 @@
+{
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Mappo",
+      "program": ".build/debug/Mappo",
+      "args": [],
+      "cwd": "${workspaceFolder:mappo}",
+      "preLaunchTask": "swift: Build Debug Mappo"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Release Mappo",
+      "program": ".build/release/Mappo",
+      "args": [],
+      "cwd": "${workspaceFolder:mappo}",
+      "preLaunchTask": "swift: Build Release Mappo"
+    }
+  ]
+}

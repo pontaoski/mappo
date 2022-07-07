@@ -5,6 +5,9 @@ import PackageDescription
 
 let package = Package(
     name: "Mappo",
+    platforms: [
+        .macOS(.v12)
+    ],
     dependencies: [
         .package(url: "https://github.com/SketchMaster2001/Swiftcord", branch: "master"),
         .package(url: "https://github.com/vapor/async-kit.git", from: "1.0.0"),

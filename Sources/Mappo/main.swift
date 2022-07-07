@@ -43,6 +43,17 @@ enum Role {
 		return true
 	}
 
+	var defaultTeam: Team {
+		switch self {
+			case .jester:
+				return .jester
+			case .werewolf:
+				return .werewolf
+			default:
+				return .village
+		}
+	}
+
 	var absoluteMax: Int {
 		switch self {
 		case .guardianAngel, .seer, .beholder, .jester, .cookiePerson:
@@ -105,6 +116,12 @@ enum Role {
 	static let evil: [Role] = [.werewolf]
 }
 
+enum Team: Equatable {
+	case village
+	case werewolf
+	case jester
+}
+
 enum Action: Equatable {
 	case kill(who: Snowflake)
 	case freeze(who: Snowflake)
@@ -138,12 +155,29 @@ enum GameState {
 	case playing
 }
 
-enum DeathReason {
+enum DeathReason: Equatable {
 	case werewolf
 	case exile
 	case visitedWerewolf
 	case visitedSomeoneBeingVisitedByWerewolf(visiting: Snowflake)
 	case protectedWerewolf
+}
+
+enum VictoryReason {
+	case allWerewolvesDead
+	case werewolvesMajority
+	case jesterExiled
+
+	var winningTeam: Team {
+		switch self {
+		case .allWerewolvesDead:
+			return .village
+		case .werewolvesMajority:
+			return .werewolf
+		case .jesterExiled:
+			return .jester
+		}
+	}
 }
 
 enum TimeOfYear {
@@ -214,6 +248,9 @@ class State {
 	// user -> role
 	var roles: [Snowflake: Role] = [:]
 
+	// user -> team
+	var teams: [Snowflake: Team] = [:]
+
 	// id -> user
 	var users: [Snowflake: User] = [:]
 
@@ -264,6 +301,7 @@ class State {
 		self.actions = [:]
 		self.actionMessages = [:]
 		self.roles = [:]
+		self.teams = [:]
 		self.votes = [:]
 		self.alive = [:]
 	}
@@ -307,6 +345,10 @@ class State {
 		let neutral = max(shuffle.count - (evil + good), 0)
 		shuffle.suffix(neutral).forEach {
 			roles[$0] = eligible(Role.neutral).randomElement()!
+		}
+
+		party.forEach {
+			teams[$0] = roles[$0]?.defaultTeam
 		}
 
 		for user in shuffle {
@@ -393,7 +435,6 @@ class State {
 
 			// finish up night actions
 			try await endNight()
-			try await checkWin()
 			if state != .playing {
 				try await endGameCleanup()
 				return
@@ -416,8 +457,6 @@ class State {
 			try await announceVote()
 			try await Task.sleep(nanoseconds: 30_000_000_000)
 			try await concludeVote()
-
-			try await checkWin()
 			if state != .playing {
 				try await endGameCleanup()
 				return
@@ -429,10 +468,10 @@ class State {
 		let txt = users.values.map { ($0, alive[$0.id]!) }
 			.map { item -> String in
 				if item.1 {
-					return ":white_check_mark: <@\(item.0.id)>"
+					return ":slight_smile: <@\(item.0.id)>"
 				} else {
 					let role = roles[item.0.id]!
-					return ":x: <@\(item.0.id)> (was a \(role.roleName))"
+					return ":skull: <@\(item.0.id)> (was a \(role.roleName))" // TODO: should we show people's roles when they die?
 				}
 			}
 			.joined(separator: "\n")
@@ -592,12 +631,6 @@ class State {
 			}
 			break
 		case .exile:
-			if roles[who] == .jester {
-				state = .waiting
-				try await checkWin()
-				_ = try await thread?.send("<@\(who)> was the Jester! They win!")
-				return
-			}
 			try await kill(who, because: why)
 		case .protectedWerewolf:
 			if Double.random(in: 0...1) > 0.5 {
@@ -606,6 +639,7 @@ class State {
 				try await kill(who, because: .protectedWerewolf)
 			}
 		}
+		try await handlePossibleWin(whoDied: who, why: why)
 	}
 
 	func endNight() async throws {
@@ -644,31 +678,49 @@ class State {
 		actions = [:]
 	}
 
-	func checkWin() async throws {
-		let aliveEvil = roles.filter { roles[$0.key] == .werewolf }
+	func checkWin(whoDied: Snowflake, why: DeathReason) -> VictoryReason? {
+		let werewolvesAlive = roles.filter { teams[$0.key] == .werewolf }
 			.filter { alive[$0.key] == true }
-		let aliveNotEvil = roles.filter { roles[$0.key] != .werewolf }
+		let nonWerewolvesAlive = roles.filter { teams[$0.key] != .werewolf }
 			.filter { alive[$0.key] == true }
 
-		if aliveEvil.count == 0 {
-			_ = try await thread?.send(EmbedBuilder.good.setTitle(title: "The villagers win!"))
-			state = .waiting
-		} else if aliveEvil.count >= aliveNotEvil.count {
-			_ = try await thread?.send(EmbedBuilder.bad.setTitle(title: "The werewolves win!"))
-			state = .waiting
+		if werewolvesAlive.count == 0 {
+			return .allWerewolvesDead
+		} else if werewolvesAlive.count >= nonWerewolvesAlive.count {
+			return .werewolvesMajority
 		}
 
-		if state == .waiting {
-			let txt = users.values
-				.map { item -> String in
-					let role = roles[item.id]!
-					let alive = alive[item.id]! ? ":white_check_mark:" : ":x:"
-					return "\(alive) <@\(item.id)> (was a \(role.roleName))"
-				}
-				.joined(separator: "\n")
-			_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Players").setDescription(description: txt))
-			clear()
+		if roles[whoDied] == .jester && why == .exile {
+			return .jesterExiled
 		}
+
+		return nil
+	}
+
+	func handlePossibleWin(whoDied: Snowflake, why: DeathReason) async throws {
+		guard let reason = checkWin(whoDied: whoDied, why: why) else {
+			return
+		}
+
+		switch reason {
+		case .allWerewolvesDead:
+			_ = try await thread?.send("All the werewolves are dead!")
+		case .jesterExiled:
+			_ = try await thread?.send("The jester got exiled!")
+		case .werewolvesMajority:
+			_ = try await thread?.send("Oops, looks like there's more werewolves than villagers now!")
+		}
+
+		state = .waiting
+		let txt = users.values
+			.map { item -> String in
+				let role = roles[item.id]!
+				let alive = alive[item.id]! ? ":slight_smile:" : ":skull:"
+				let won = teams[item.id] == reason.winningTeam ? ":trophy:" : ":x:"
+				return "\(won)\(alive) <@\(item.id)> (was a \(role.roleName))"
+			}
+			.joined(separator: "\n")
+		_ = try await thread?.send(EmbedBuilder.info.setTitle(title: "Players").setDescription(description: txt))
 	}
 }
 

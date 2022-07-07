@@ -661,7 +661,7 @@ class State {
 		actions = [:]
 	}
 
-	func checkWin(whoDied: Snowflake, why: DeathReason) -> Optional<(String, Team)> {
+	func checkWin(whoDied: Snowflake, why: DeathReason) -> (String, Team)? {
 		let werewolvesAlive = roles.filter { teams[$0.key] == .werewolf }
 			.filter { alive[$0.key] == true }
 		let nonWerewolvesAlive = roles.filter { teams[$0.key] != .werewolf }

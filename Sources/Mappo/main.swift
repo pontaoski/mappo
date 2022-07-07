@@ -690,7 +690,7 @@ class State {
 			.map { item -> String in
 				let role = roles[item.id]!
 				let alive = alive[item.id]! ? ":heart:" : ":skull:"
-				let won = teams[item.id] == winners ? ":white_check_mark:" : ":x:"
+				let won = teams[item.id] == winners ? ":trophy:" : ":x:"
 				return "\(won)\(alive) <@\(item.id)> (was a \(role.roleName))"
 			}
 			.joined(separator: "\n")

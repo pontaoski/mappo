@@ -681,7 +681,9 @@ class State {
 	}
 
 	func handlePossibleWin(whoDied: Snowflake, why: DeathReason) async throws {
-		let (message, winners) = checkWin(whoDied: whoDied, why: why)!;
+		guard let (message, winners) = checkWin(whoDied: whoDied, why: why) else {
+			return
+		}
 		_ = try await thread?.send(message)
 		state = .waiting
 		let txt = users.values

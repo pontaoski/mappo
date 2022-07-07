@@ -451,10 +451,10 @@ class State {
 		let txt = users.values.map { ($0, alive[$0.id]!) }
 			.map { item -> String in
 				if item.1 {
-					return ":white_check_mark: <@\(item.0.id)>"
+					return ":heart: <@\(item.0.id)>"
 				} else {
 					let role = roles[item.0.id]!
-					return ":x: <@\(item.0.id)> (was a \(role.roleName))"
+					return ":skull: <@\(item.0.id)> (was a \(role.roleName))" // TODO: should we show people's roles when they die?
 				}
 			}
 			.joined(separator: "\n")
@@ -689,7 +689,7 @@ class State {
 		let txt = users.values
 			.map { item -> String in
 				let role = roles[item.id]!
-				let alive = alive[item.id]! ? ":heart:" : ":broken_heart:"
+				let alive = alive[item.id]! ? ":heart:" : ":skull:"
 				let won = teams[item.id] == winners ? ":white_check_mark:" : ":x:"
 				return "\(won)\(alive) <@\(item.id)> (was a \(role.roleName))"
 			}

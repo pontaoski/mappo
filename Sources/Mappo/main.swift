@@ -308,6 +308,9 @@ class State {
 	// who's alive?
 	var alive: [Snowflake: Bool] = [:]
 
+	// who's voting yay/nay
+	var votes: [Snowflake: Bool] = [:]
+
 	var state: GameState = .waiting
 
 	var timeOfYear: TimeOfYear
@@ -344,6 +347,7 @@ class State {
 		self.teams = [:]
 		self.alive = [:]
 		self.nominees = []
+		self.votes = [:]
 	}
 
 	func eligible(_ against: [Role]) -> [Role] {
@@ -508,7 +512,30 @@ class State {
 				try await Task.sleep(nanoseconds: 30_000_000_000)
 
 				if nominees.count == 0 {
-					
+					_ = try await thread?.send("Oops, doesn't look like there's any nominees tonight...")
+				} else {
+					_ = try await thread?.send("Let's go through all of the nominations! We have \(nominees.count) of them tonight. We'll stop if and when we vote someone out.")
+					for nominee in nominees {
+						self.votes = [:]
+						_ = try await thread?.send(ButtonBuilder(message: "Are we voting out <@\(nominee)> tonight? You have 30 seconds to vote.").addComponent(component: .init(components:
+							Button(customId: "vote-yes", style: .green, label: "Yes"),
+							Button(customId: "vote-no", style: .red, label: "No")
+						)))
+						_ = try await Task.sleep(nanoseconds: 30_000_000_000)
+						if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
+							_ = try await thread?.send("Looks like we're exiling <@\(nominee)> tonight! Bye-bye!")
+							_ = try await attemptKill(nominee, because: .exile)
+							break
+						} else {
+							_ = try await thread?.send("Looks like we're not exiling <@\(nominee)> tonight!")
+						}
+					}
+					if state != .playing {
+						try await endGameCleanup()
+						return
+					}
+					_ = try await thread?.send("Dusk draws near, and it's time to get to bed... A little more discussion time (25 seconds) for you before that, though!")
+					try await Task.sleep(nanoseconds: 25_000_000_000)
 				}
 			} else {
 				_ = try await thread?.send("Dusk draws near, and it looks like nobody's getting nominated tonight...")
@@ -866,7 +893,7 @@ class MyBot: ListenerAdapter {
 				_ = try await event.reply(message: "A game is already in progress!")
 				return
 			}
-			guard event.state.party.count >= 1 else {
+			guard event.state.party.count >= 4 else {
 				_ = try await event.reply(message: "You need at least 4 people to start playing!")
 				return
 			}
@@ -972,7 +999,7 @@ class MyBot: ListenerAdapter {
 		case "nominate":
 			event.setEphemeral(true)
 			guard state.alive[event.user.id] == true else {
-				try await event.reply(message: "You aren't alive to vote!")
+				try await event.reply(message: "You aren't alive to nominate!")
 				return
 			}
 			if state.nominees.contains(target) {
@@ -1016,6 +1043,24 @@ class MyBot: ListenerAdapter {
 				state.nominationCondition.release()
 			}
 			break
+		case "vote-yes":
+			guard state.alive[event.user.id] == true else {
+				try await event.reply(message: "You aren't alive to vote!")
+				return
+			}
+			state.votes[event.user.id] = true
+			event.setEphemeral(true)
+			_ = try await event.reply(message: "Your vote has been submitted!")
+			_ = try await state.thread?.send("<@\(event.user.id)> has voted yes!")
+		case "vote-no":
+			guard state.alive[event.user.id] == true else {
+				try await event.reply(message: "You aren't alive to vote!")
+				return
+			}
+			state.votes[event.user.id] = false
+			event.setEphemeral(true)
+			_ = try await event.reply(message: "Your vote has been submitted!")
+			_ = try await state.thread?.send("<@\(event.user.id)> has voted no!")
 		default:
 			_ = try? await event.reply(message: "Oops, I don't understand which button you pressed...")
 		}

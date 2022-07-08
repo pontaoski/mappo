@@ -386,6 +386,7 @@ public class State<Comm: Communication> {
 	}
 
 	func resetNominationCondition() {
+		self.readyToNominate = [:]
 		self.nominationCondition = .init(for: self.eventLoop)
 	}
 

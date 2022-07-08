@@ -273,7 +273,7 @@ public extension Sendable {
 }
 
 public protocol Deletable {
-    func delete() async throws
+	func delete() async throws
 }
 
 public protocol Replyable {
@@ -288,7 +288,7 @@ public protocol Communication {
 	associatedtype Interaction: Replyable
 
 	func getChannel(for: UserID, state: State<Self>) async throws -> Channel?
-    func createGameThread(state: State<Self>) async throws -> Channel?
+	func createGameThread(state: State<Self>) async throws -> Channel?
 	func archive(_: Channel, state: State<Self>) async throws
 	func onJoined(_: UserID, state: State<Self>) async throws
 	func onLeft(_: UserID, state: State<Self>) async throws
@@ -449,9 +449,9 @@ public class State<Comm: Communication> {
 
 		for user in shuffle {
 			let dms = try await comm.getChannel(for: user, state: self)
-            _ = try await dms?.send(
-                CommunicationEmbed(title: roles[user]!.roleName, body: roles[user]!.roleDescription)
-            )
+			_ = try await dms?.send(
+				CommunicationEmbed(title: roles[user]!.roleName, body: roles[user]!.roleDescription)
+			)
 			// do {
 			// } catch ResponseError.nonSuccessfulRequest(let code) where code.code == 50007 {
 			// 	_ = try await thread?.send("I can't DM <@\(user)>!")

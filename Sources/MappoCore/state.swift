@@ -523,12 +523,13 @@ public class State<Comm: Communication> {
 		}
 
 		_ = try await thread?.send("Dusk draws near, and the villagers gather to decide who they are nominating this evening...")
-		_ = try await thread?.send("Everyone has 30 seconds to nominate someone!")
+		_ = try await thread?.send("Everyone has 15 seconds to nominate someone!")
 
 		let possible = party.filter { alive[$0]! }
+		nominees = []
 		_ = try await thread?.send(userSelection: possible, id: "nominate", label: "Nominate people (or don't!)")
 
-		try await Task.sleep(nanoseconds: 30_000_000_000)
+		try await Task.sleep(nanoseconds: 15_000_000_000)
 
 		if nominees.count == 0 {
 			_ = try await thread?.send("Oops, doesn't look like there's any nominees tonight... Off to bed it is, then.")
@@ -539,12 +540,12 @@ public class State<Comm: Communication> {
 		_ = try await thread?.send("Let's go through all of the nominations! We have \(nominees.count) of them tonight. We'll stop if and when we vote someone out.")
 		for nominee in nominees {
 			self.votes = [:]
-			_ = try await thread?.send("Are we voting out <@\(nominee)> tonight? You have 30 seconds to vote.")
+			_ = try await thread?.send("Are we voting out <@\(nominee)> tonight? You have 15 seconds to vote.")
 			_ = try await thread?.send(
 				CommunicationButton(id: "vote-yes", label: "Yes", color: .good),
 				CommunicationButton(id: "vote-no", label: "No", color: .bad)
 			)
-			_ = try await Task.sleep(nanoseconds: 30_000_000_000)
+			_ = try await Task.sleep(nanoseconds: 15_000_000_000)
 			if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
 				_ = try await thread?.send("Looks like we're exiling <@\(nominee)> tonight! Bye-bye!")
 				_ = try await attemptKill(nominee, because: .exile)

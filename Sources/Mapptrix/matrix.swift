@@ -70,6 +70,7 @@ final class DefaultSyncer: MatrixSyncer {
 				event.roomID = roomID
 				await broadcast(event)
 			}
+			try await storage.saveRoom(room)
 		}
 		for (roomID, roomData) in (response.rooms?.invite ?? [:]) {
 			let room = try await getOrCreateRoom(id: roomID)
@@ -78,17 +79,19 @@ final class DefaultSyncer: MatrixSyncer {
 				room.updateState(against: event)
 				await broadcast(event)
 			}
+			try await storage.saveRoom(room)
 		}
 		for (roomID, roomData) in (response.rooms?.leave ?? [:]) {
 			let room = try await getOrCreateRoom(id: roomID)
 			for var event in roomData.timeline.events {
 				guard event.stateKey != nil else {
-					return
+					continue
 				}
 				event.roomID = roomID
 				room.updateState(against: event)
 				await broadcast(event)
 			}
+			try await storage.saveRoom(room)
 		}
 	}
 
@@ -140,10 +143,9 @@ final class MatrixRoom: Codable {
 		self.state = [:]
 	}
 	func updateState(against event: MatrixEvent) {
-		if !state.keys.contains(event.type) {
-			state[event.type] = [:]
-		}
-		state[event.type]![event.stateKey!] = event
+		var dict = state[event.type] ?? [:]
+		dict[event.stateKey!] = event
+		state[event.type] = dict
 	}
 }
 
@@ -425,7 +427,7 @@ final class MatrixClient {
 	func createFilter(_ filter: JSONValue) async throws -> String {
 		let url = buildURL(path: "user", userID!, "filter")
 		let request = try createRequest(for: url, method: .POST, body: filter)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(10), logger: self.logger)
+		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 
 		struct Response: Decodable {
 			let filterID: String
@@ -456,7 +458,7 @@ final class MatrixClient {
 		]
 		components.queryItems = components.queryItems?.filter({ $0.value != nil })
 		let request = try createRequest(for: components.url!, method: .GET)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(Int64(timeout) + 5), logger: self.logger)
+		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(Int64(timeout) + 15), logger: self.logger)
 		return try await resp.into()
 	}
 
@@ -470,7 +472,7 @@ final class MatrixClient {
 	) async throws -> String {
 		let url = buildURL(path: "rooms", roomID, "send", "m.room.message", transactionID())
 		let request = try createRequest(for: url, method: .PUT, body: content)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(10), logger: self.logger)
+		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 		let response: EventSendResponse = try await resp.into()
 		return response.event_id
 	}

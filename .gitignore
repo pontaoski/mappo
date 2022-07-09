@@ -1,5 +1,6 @@
 .DS_Store
 config.json
+matrix_config.json
 /.build
 /Packages
 /*.xcodeproj
@@ -8,3 +9,4 @@ DerivedData/
 .swiftpm/config/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+matrix.db

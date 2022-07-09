@@ -11,6 +11,9 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/SketchMaster2001/Swiftcord", branch: "master"),
         .package(url: "https://github.com/vapor/async-kit.git", from: "1.0.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.9.0"),
+        .package(url: "https://github.com/rexmas/JSONValue.git", from: "7.0.0"),
+        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.13.3"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -22,6 +25,9 @@ let package = Package(
         .executableTarget(
             name: "Mappo",
             dependencies: ["MappoCore", "Swiftcord", .product(name: "AsyncKit", package: "async-kit")]),
+        .executableTarget(
+            name: "Mapptrix",
+            dependencies: ["MappoCore", .product(name: "SQLite", package: "SQLite.swift"), .product(name: "JSONValueRX", package: "JSONValue"), .product(name: "AsyncHTTPClient", package: "async-http-client"), .product(name: "AsyncKit", package: "async-kit")]),
         .testTarget(
             name: "MappoTests",
             dependencies: ["Mappo"]),

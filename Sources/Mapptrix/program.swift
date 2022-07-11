@@ -28,18 +28,7 @@ struct Main {
 			accessToken: token
 		)
 
-		syncer.listen(to: "m.room.message") { event in
-			guard let msg = event.content as? MatrixMessageContent else {
-				return
-			}
-			guard let body = msg.body else {
-				return
-			}
-			if body.hasPrefix("bot, echo ") {
-				let trimmed = body.dropFirst("bot, echo ".count)
-				_ = try? await client.sendMessage(to: event.roomID!, content: MatrixMessageContent(body: "You said: \(trimmed)"))
-			}
-		}
+		let _ = MatrixMappo(client: client, eventLoop: evGroup.next(), syncer: syncer)
 
 		try! await client.sync()
 	}

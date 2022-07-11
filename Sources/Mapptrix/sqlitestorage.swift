@@ -14,6 +14,9 @@ final class SQLiteStorage: MatrixStorage {
 	let roomID = Expression<String>("roomID")
 	let roomContent = Expression<Data>("roomContent")
 
+	let dms = Table("dms")
+	let dmRoomID = Expression<String>("dm_room_id")
+
 	init(databasePath: String) throws {
 		self.db = try Connection(databasePath)
 
@@ -30,6 +33,11 @@ final class SQLiteStorage: MatrixStorage {
 		try db.run(rooms.create(ifNotExists: true) { t in
 			t.column(roomID, primaryKey: true)
 			t.column(roomContent)
+		})
+
+		try db.run(dms.create(ifNotExists: true) { t in
+			t.column(forUserID, primaryKey: true)
+			t.column(dmRoomID)
 		})
 	}
 
@@ -70,5 +78,17 @@ final class SQLiteStorage: MatrixStorage {
 		let data = try it.get(roomContent)
 		let room = try JSONDecoder().decode(MatrixRoom.self, from: data)
 		return room
+	}
+
+	func saveDMRoomID(_ id: String, for userID: String) async throws {
+		let insert = dms.insert(or: .replace, forUserID <- userID, dmRoomID <- id)
+		try db.run(insert)
+	}
+
+	func loadDMRoomID(for userID: String) async throws -> String? {
+		guard let it = try db.pluck(dms.select(dmRoomID).filter(forUserID == userID)) else {
+			return nil
+		}
+		return try it.get(dmRoomID)
 	}
 }

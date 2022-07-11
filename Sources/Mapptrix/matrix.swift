@@ -16,6 +16,9 @@ protocol MatrixStorage {
 
 	func saveRoom(_ room: MatrixRoom) async throws
 	func loadRoom(id: String) async throws -> MatrixRoom?
+
+	func saveDMRoomID(_ id: String, for userID: String) async throws
+	func loadDMRoomID(for userID: String) async throws -> String?
 }
 
 protocol MatrixSyncer {
@@ -108,6 +111,7 @@ final class InMemoryStorage: MatrixStorage {
 	var filters: [String: String] = [:]
 	var nextBatches: [String: String] = [:]
 	var rooms: [String: MatrixRoom] = [:]
+	var dmRoomIDS: [String: String] = [:]
 
 	func saveFilterID(id: String, for userID: String) async throws {
 		filters[userID] = id
@@ -131,6 +135,14 @@ final class InMemoryStorage: MatrixStorage {
 
 	func loadRoom(id: String) async throws -> MatrixRoom? {
 		return rooms[id]
+	}
+
+	func saveDMRoomID(_ id: String, for userID: String) async throws {
+		dmRoomIDS[id] = userID
+	}
+
+	func loadDMRoomID(for userID: String) async throws -> String? {
+		return dmRoomIDS[userID]
 	}
 }
 
@@ -163,13 +175,95 @@ final class MatrixUnknownContent: MatrixContent {
 	}
 }
 
-final class MatrixMessageContent: MatrixContent {
-	let messageType: String
-	let body: String?
+protocol MatrixMessageType: Codable {
+	var messageType: String { get }
+}
 
-	init(body: String) {
-		self.messageType = "m.type"
+final class MatrixUnknownMessageType: MatrixMessageType {
+	let messageType: String
+	let data: JSONValue
+
+	func encode(to encoder: Encoder) throws {
+		var values = encoder.container(keyedBy: CodingKeys.self)
+		try values.encode(messageType, forKey: .messageType)
+		try data.encode(to: encoder)
+	}
+	init(from decoder: Decoder) throws {
+		data = try .init(from: decoder)
+		let values = try decoder.container(keyedBy: CodingKeys.self)
+		messageType = try values.decode(String.self, forKey: .messageType)
+	}
+
+	enum CodingKeys: String, CodingKey {
+		case messageType = "msgtype"
+	}
+}
+
+final class MatrixTextMessage: MatrixMessageType {
+	static let messageType: String = "m.text"
+	let messageType: String = "m.text"
+
+	let richContent: (format: String, body: String)?
+
+	func encode(to encoder: Encoder) throws {
+		var values = encoder.container(keyedBy: CodingKeys.self)
+		if let rich = richContent {
+			try values.encode(rich.format, forKey: .format)
+			try values.encode(rich.body, forKey: .formattedBody)
+		}
+	}
+	init() {
+		self.richContent = nil
+	}
+	init(format: String, body: String) {
+		self.richContent = (format, body)
+	}
+	init(from decoder: Decoder) throws {
+		let values = try decoder.container(keyedBy: CodingKeys.self)
+		if values.contains(.format) {
+			let format = try values.decode(String.self, forKey: .format)
+			let body = try values.decode(String.self, forKey: .formattedBody)
+
+			self.richContent = (format, body)
+		} else {
+			self.richContent = nil
+		}
+	}
+
+	enum CodingKeys: String, CodingKey {
+		case format
+		case formattedBody = "formatted_body"
+	}
+}
+
+final class MatrixMessageContent: MatrixContent {
+	let messageType: MatrixMessageType
+	let body: String
+
+	init(body: String, _ content: MatrixMessageType = MatrixTextMessage()) {
+		self.messageType = content
 		self.body = body
+	}
+	init(html: String, plaintext: String) {
+		self.messageType = MatrixTextMessage(format: "org.matrix.custom.html", body: html)
+		self.body = plaintext
+	}
+	init(from decoder: Decoder) throws {
+		let values = try decoder.container(keyedBy: CodingKeys.self)
+		self.body = try values.decode(String.self, forKey: .body)
+		let messageType = try values.decode(String.self, forKey: .messageType)
+		switch messageType {
+		case MatrixTextMessage.messageType:
+			self.messageType = try MatrixTextMessage(from: decoder)
+		default:
+			self.messageType = try MatrixUnknownMessageType(from: decoder)
+		}
+	}
+	func encode(to encoder: Encoder) throws {
+		var values = encoder.container(keyedBy: CodingKeys.self)
+		try values.encode(messageType.messageType, forKey: .messageType)
+		try values.encode(self.body, forKey: .body)
+		try messageType.encode(to: encoder)
 	}
 
 	enum CodingKeys: String, CodingKey {
@@ -464,6 +558,43 @@ final class MatrixClient {
 
 	struct EventSendResponse: Codable {
 		let event_id: String
+	}
+
+	func getDM(
+		for userID: String
+	) async throws -> String {
+		if let roomID = try await storage.loadDMRoomID(for: userID) {
+			return roomID
+		}
+
+		let url = buildURL(path: "createRoom")
+		let params = try JSONValue(object: [
+			"preset": "private_chat",
+			"invite": [userID]
+		])
+		let request = try createRequest(for: url, method: .POST, body: params)
+		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+
+		struct RoomCreateResponse: Codable {
+			let room_id: String
+		}
+		let response: RoomCreateResponse = try await resp.into()
+
+		try await storage.saveDMRoomID(response.room_id, for: userID)
+		return response.room_id
+	}
+
+	func redactEvent(
+		id: String,
+		in roomID: String
+	) async throws {
+		let url = buildURL(path: "rooms", roomID, "redact", id, transactionID())
+		let request = try createRequest(for: url, method: .PUT)
+		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+		struct RedactResponse: Codable {
+			let event_id: String
+		}
+		let _: RedactResponse = try await resp.into()
 	}
 
 	func sendMessage(

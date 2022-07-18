@@ -251,6 +251,8 @@ class MyBot: ListenerAdapter {
 			try await state.cookiesGive(who: event.user.id, target: target, interaction: DiscordInteraction(interaction: event))
 		case "nominate":
 			try await state.nominate(who: event.user.id, target: target, interaction: DiscordInteraction(interaction: event))
+		case "goose":
+			try await state.goose(who: event.user.id, target: target, interaction: DiscordInteraction(interaction: event))
 		default:
 			event.setEphemeral(true)
 			try await event.reply(message: "Oops, I don't understand what you just did. Sorry.")

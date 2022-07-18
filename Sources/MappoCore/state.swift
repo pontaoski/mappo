@@ -22,6 +22,11 @@ public class ConditionVariable {
 		try await future.get()
 	}
 }
+enum Disposition {
+	case evil
+	case neutral
+	case good
+}
 enum Role {
 	case villager
 	case werewolf
@@ -31,11 +36,17 @@ enum Role {
 	case jester
 	case cookiePerson
 	case furry
+	case innocent
+	case pacifist
+	case goose
+	case cursed
 
 	func appearsAs(to: Role) -> Role {
 		switch (self, to) {
 		case (.furry, .seer):
 			return .werewolf
+		case (.cursed, .seer):
+			return .villager
 		default:
 			return self
 		}
@@ -53,6 +64,11 @@ enum Role {
 				return false
 			}
 		}
+		if self.disposition == .evil {
+			guard roles.contains(.werewolf) || self == .werewolf else {
+				return false
+			}
+		}
 		return true
 	}
 
@@ -60,7 +76,7 @@ enum Role {
 		switch self {
 			case .jester:
 				return .jester
-			case .werewolf:
+			case .werewolf, .goose, .cursed:
 				return .werewolf
 			default:
 				return .village
@@ -69,15 +85,17 @@ enum Role {
 
 	var absoluteMax: Int {
 		switch self {
-		case .guardianAngel, .seer, .beholder, .jester, .cookiePerson:
+		case .guardianAngel, .seer, .beholder, .jester, .cookiePerson, .innocent, .pacifist, .cursed:
 			return 1
+		case .furry:
+			return 2
 		default:
 			return Int.max
 		}
 	}
 	var minimumPlayerCount: Int {
 		switch self {
-		case .beholder, .cookiePerson, .jester:
+		case .beholder, .cookiePerson, .jester, .seer:
 			return 5
 		default:
 			return 0
@@ -101,6 +119,14 @@ enum Role {
 			return "Cookie Person"
 		case .furry:
 			return "Furry"
+		case .innocent:
+			return "Innocent"
+		case .pacifist:
+			return "Pacifist"
+		case .goose:
+			return "Goose"
+		case .cursed:
+			return "Cursed"
 		}
 	}
 	var roleDescription: String {
@@ -121,12 +147,30 @@ enum Role {
 			return "Every night, you can choose to visit someone and give them cookies. If you visit a wolf, you will be killed. However, if you're visiting someone and the wolves try to kill you, you'll survive! (because you weren't home). If the wolves kill someone you're visiting, they'll kill you as well."
 		case .furry:
 			return "You love to cosplay as a wolf! The problem is, the seer doesn't know what's up with these newfangled youths, and assumes you are a wolf. Oops."
+		case .innocent:
+			return "You are such a beacon of purity that you have gained the protection of an army of angels. The first time you are nominated, the angels will kill them immediately if they aren't evil."
+		case .pacifist:
+			return "You are staunchly opposed to death, so much so that you run a secret program to help executed good players escape from the executioner. It doesn't always work, though..."
+		case .goose:
+			return "You only want to see one thing: to see the world burn. Every night, you choose someone neutral or good to goose. For that night, if they take a night action, they'll target a random person instead."
+		case .cursed:
+			return "You are cursed! You appear as a villager to the seer, but, when the werewolf dies, you become a werewolf!"
+		}
+	}
+	var disposition: Disposition {
+		switch self {
+		case .guardianAngel, .seer, .beholder, .pacifist:
+			return .good
+		case .villager, .jester, .cookiePerson, .furry, .innocent:
+			return .neutral
+		case .werewolf, .cursed, .goose:
+			return .evil
 		}
 	}
 
-	static let good: [Role] = [.guardianAngel, .seer, .beholder]
-	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry]
-	static let evil: [Role] = [.werewolf]
+	static let good: [Role] = [.guardianAngel, .seer, .beholder, .pacifist]
+	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry, .innocent]
+	static let evil: [Role] = [.werewolf, .cursed, .goose]
 }
 
 enum Team: Equatable {
@@ -147,6 +191,7 @@ enum DeathReason<T: Communication>: Equatable {
 	case visitedWerewolf
 	case visitedSomeoneBeingVisitedByWerewolf(visiting: T.UserID)
 	case protectedWerewolf
+	case nominatedInnocent
 }
 
 enum VictoryReason {
@@ -301,12 +346,13 @@ public class State<Comm: Communication> {
 		case protect(who: Comm.UserID)
 		case check(who: Comm.UserID)
 		case giveCookies(to: Comm.UserID)
+		case goose(who: Comm.UserID)
 
 		func isValid<T: Sequence>(doer: Comm.UserID, with actions: T) -> Bool where T.Element == Action {
 			if actions.contains(.freeze(who: doer)) {
 				return false
 			}
-			if actions.contains(.kill(who: doer)) && !self.awayFromHome {
+			if actions.contains(.kill(who: doer)) && self != .protect(who: doer) && !self.awayFromHome {
 				return false
 			}
 			return true
@@ -316,7 +362,7 @@ public class State<Comm: Communication> {
 			switch self {
 			case .kill, .giveCookies:
 				return true
-			case .freeze, .protect, .check:
+			case .freeze, .protect, .check, .goose:
 				return false
 			}
 		}
@@ -374,6 +420,8 @@ public class State<Comm: Communication> {
 
 	var comm: Comm
 
+	var nominatedBefore: Set<Comm.UserID> = []
+
 	public init(for channel: Comm.Channel, in comm: Comm, eventLoop: EventLoop) {
 		self.channel = channel
 		self.comm = comm
@@ -401,6 +449,7 @@ public class State<Comm: Communication> {
 		self.alive = [:]
 		self.nominees = []
 		self.votes = [:]
+		self.nominatedBefore = []
 	}
 
 	func eligible(_ against: [Role]) -> [Role] {
@@ -428,8 +477,8 @@ public class State<Comm: Communication> {
 			alive[$0] = true
 		}
 		let shuffle = party.shuffled()
-		let evil = max(Int(floor(Float(shuffle.count) * 0.2)), 1)
-		let good = max(Int(floor(Float(shuffle.count) * 0.4)), 2)
+		let evil = max(Int(round(Float(shuffle.count) * 0.29)), 1)
+		let good = max(Int(round(Float(shuffle.count) * 0.4)), 2)
 		let specials = shuffle.prefix(evil + good)
 
 		specials.prefix(evil).forEach {
@@ -615,16 +664,16 @@ public class State<Comm: Communication> {
 				continue
 			}
 			switch roles[user]! {
-			case .villager, .jester, .beholder, .furry:
+			case .villager, .jester, .beholder, .furry, .innocent, .pacifist, .cursed:
 				break
 			case .werewolf:
 				let menu: Set<Comm.UserID>
 				if self.timeOfYear == .earlyWinter || self.timeOfYear == .lateWinter {
 					_ = try await dm.send(CommunicationEmbed(title: "Looks like it's winter! With your snow coat, it's time to freeze someone tonight! This will prevent them from performing any action today."))
-					menu = party.filter { $0 != user }.filter { alive[$0]! }
+					menu = party.filter { $0 != user }.filter { alive[$0]! }.filter { roles[$0]?.disposition != .evil }
 				} else {
 					_ = try await dm.send(CommunicationEmbed(title: "Time to kill someone tonight!"))
-					menu = party.filter { alive[$0]! }
+					menu = party.filter { alive[$0]! }.filter { $0 == user || roles[$0]?.disposition != .evil }
 				}
 				actionMessages[user] = try await dm.send(userSelection: menu, id: "werewolf-kill", label: "")
 			case .guardianAngel:
@@ -639,6 +688,10 @@ public class State<Comm: Communication> {
 				_ = try await dm.send(CommunicationEmbed(title: "Time to visit someone tonight!"))
 				let possible = party.filter { $0 != user }.filter { alive[$0]! }
 				actionMessages[user] = try await dm.send(userSelection: possible, id: "cookies-give", label: "Choose someone to visit during the night and give them cookies")
+			case .goose:
+				_ = try await dm.send(CommunicationEmbed(title: "Time to goose someone tonight!"))
+				let possible = party.filter { $0 != user }.filter { alive[$0]! }.filter { roles[$0]?.disposition != .evil }
+				actionMessages[user] = try await dm.send(userSelection: possible, id: "goose", label: "Choose someone to goose tonight!")
 			}
 		}
 	}
@@ -672,6 +725,8 @@ public class State<Comm: Communication> {
 			reason = "You died because you were visiting <@\(visiting)>, but unfortunately, a werewolf was visiting them too!"
 		case .protectedWerewolf:
 			reason = "You died because you protected a werewolf!"
+		case .nominatedInnocent:
+			reason = "You died because you were the first person to nominate an Innocent!"
 		}
 		_ = try await dm?.send(CommunicationEmbed(body: reason, color: .bad))
 		alive[who] = false
@@ -723,6 +778,13 @@ public class State<Comm: Communication> {
 			}
 			break
 		case .exile:
+			if roles[who]?.disposition != .evil && roles.filter({ alive[$0.key]! }).contains(where: { $0.value == .pacifist}) && Double.random(in: 0...1) > 0.5 {
+				_ = try await thread?.send(CommunicationEmbed(body: "The pacifist intervenes! <@\(who)> isn't going to be executed tonight!", color: .good))
+			} else {
+				try await kill(who, because: why)
+			}
+		case .nominatedInnocent:
+			_ = try await thread?.send(CommunicationEmbed(body: "<@\(who)> collapses dead due to mysterious heavenly intervention! Oops.", color: .bad))
 			try await kill(who, because: why)
 		case .protectedWerewolf:
 			if Double.random(in: 0...1) > 0.5 {
@@ -731,7 +793,22 @@ public class State<Comm: Communication> {
 				try await kill(who, because: .protectedWerewolf)
 			}
 		}
+		if roles[who] == .werewolf && roles.contains(where: { $0.value == .cursed }) {
+			let curseds = roles.filter({ $0.value == .cursed })
+			for cursed in curseds.keys {
+				roles[cursed] = .werewolf
+				let dm = try await comm.getChannel(for: cursed, state: self)
+				_ = try await dm?.send(CommunicationEmbed(body: "Looks like the werewolf died, so you're the werewolf now!", color: .good))
+			}
+		}
 		try await handlePossibleWin(whoDied: who, why: why)
+	}
+
+	func trueWho(target: Comm.UserID, for doer: Comm.UserID) -> Comm.UserID {
+		if !actions.values.contains(.goose(who: doer)) {
+			return target
+		}
+		return party.filter { alive[$0]! }.randomElement()!
 	}
 
 	func endNight() async throws {
@@ -747,22 +824,26 @@ public class State<Comm: Communication> {
 			}
 			switch action.value {
 			case .check(let who):
-				let name = roles[who]!.appearsAs(to: .seer).roleName
+				let truth = trueWho(target: who, for: action.key)
+				let name = roles[truth]!.appearsAs(to: .seer).roleName
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				_ = try await dm?.send(CommunicationEmbed(body: "<@\(who)> is a \(name)!", color: .bad))
 			case .kill(let who):
-				try await attemptKill(who, because: .werewolf)
+				let truth = trueWho(target: who, for: action.key)
+				try await attemptKill(truth, because: .werewolf)
 			case .giveCookies(let who):
-				if roles[who] == .werewolf {
+				let truth = trueWho(target: who, for: action.key)
+				if roles[truth] == .werewolf {
 					try await attemptKill(action.key, because: .visitedWerewolf)
-				} else if actions.contains(where: { $0.value == .kill(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: who))
+				} else if actions.contains(where: { $0.value == .kill(who: truth) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
+					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: truth))
 				}
 			case .protect(let who):
-				if roles[who] == .werewolf {
+				let truth = trueWho(target: who, for: action.key)
+				if roles[truth] == .werewolf {
 					try await attemptKill(action.key, because: .protectedWerewolf)
 				}
-			case .freeze(_):
+			case .freeze(_), .goose(_):
 				continue
 			}
 			try await Task.sleep(nanoseconds: 2_000_000_000)
@@ -947,12 +1028,28 @@ public class State<Comm: Communication> {
 		} else {
 			_ = try await interaction.reply(with: "You've successfully nominated <@\(target)>", epheremal: true)
 			nominees.insert(target)
+			if roles[target] == .innocent && !nominatedBefore.contains(target) && !Role.evil.contains(roles[who]!) {
+				try await attemptKill(who, because: .nominatedInnocent)
+			}
+			nominatedBefore.insert(target)
 			_ = try await thread?.send("<@\(who)> has nominated <@\(target)>!")
 		}
+	}
+	public func goose(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard alive[who] == true && roles[who] == .goose else {
+			try await interaction.reply(with: "You can't goose!", epheremal: true)
+			return
+		}
+		try await interaction.reply(with: "You're going to give goose <@\(target)> tonight!", epheremal: false)
+		actions[who] = .goose(who: target)
 	}
 
 	// button implementations
 	public func nominateYes(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard alive[who] == true else {
+			try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
+			return
+		}
 		_ = try? await interaction.reply(with: "<@\(who)> wants someone to be nominated tonight!", epheremal: false)
 		readyToNominate[who] = true
 		if readyToNominate.count >= party.count/2 {
@@ -960,6 +1057,10 @@ public class State<Comm: Communication> {
 		}
 	}
 	public func nominateNo(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard alive[who] == true else {
+			try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
+			return
+		}
 		_ = try? await interaction.reply(with: "<@\(who)> doesn't want someone to be nominated tonight!", epheremal: false)
 		readyToNominate[who] = false
 		if readyToNominate.count >= party.count/2 {
@@ -968,7 +1069,7 @@ public class State<Comm: Communication> {
 	}
 	public func voteYes(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard alive[who] == true else {
-			try await interaction.reply(with: "You aren't alive to vote!", epheremal: false)
+			try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
 			return
 		}
 		votes[who] = true
@@ -977,7 +1078,7 @@ public class State<Comm: Communication> {
 	}
 	public func voteNo(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard alive[who] == true else {
-			try await interaction.reply(with: "You aren't alive to vote!", epheremal: false)
+			try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
 			return
 		}
 		votes[who] = false

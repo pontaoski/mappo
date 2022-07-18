@@ -236,6 +236,8 @@ final class MatrixMappo {
 				try await state.cookiesGive(who: event.sender!, target: target, interaction: message)
 			case "nominate":
 				try await state.nominate(who: event.sender!, target: target, interaction: message)
+			case "goose":
+				try await state.goose(who: event.sender!, target: target, interaction: message)
 			default:
 				break
 			}

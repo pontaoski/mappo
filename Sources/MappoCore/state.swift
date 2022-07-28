@@ -531,7 +531,7 @@ public class State<Comm: Communication> {
 		}
 		if leaveQueue.count > 0 {
 			_ = try await channel.send(
-				CommunicationEmbed(title: "Some people have joined the party!", body: outgoing, color: .bad)
+				CommunicationEmbed(title: "Some people have left the party!", body: outgoing, color: .bad)
 			)
 		}
 		joinQueue = []

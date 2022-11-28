@@ -24,13 +24,16 @@ extension CommunicationEmbed {
 	}
 }
 
-class DiscordChannel: Sendable {
+class DiscordChannel: Sendable, I18nable {
 	typealias Message = SwiftcordMessage
 	typealias UserID = Snowflake
 	let channel: TextChannel
 
 	init(channel: TextChannel) {
 		self.channel = channel
+	}
+	func i18n() -> I18n {
+		English()
 	}
 	func send(_ text: String) async throws -> Message {
 		try await channel.send(text)!

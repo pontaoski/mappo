@@ -2,7 +2,7 @@ import MappoCore
 import NIO
 import Foundation
 
-class MatrixChannel: Sendable {
+class MatrixChannel: Sendable, I18nable {
 	typealias Message = MatrixMessage
 	typealias UserID = String
 
@@ -14,6 +14,9 @@ class MatrixChannel: Sendable {
 		self.room = room
 	}
 
+	func i18n() -> I18n {
+		English()
+	}
 	func send(_ text: String) async throws -> Message {
 		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(
 			html: text.replacingMentionsWithHTML,

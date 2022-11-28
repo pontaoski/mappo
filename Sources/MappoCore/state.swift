@@ -27,7 +27,7 @@ enum Disposition {
 	case neutral
 	case good
 }
-enum Role {
+public enum Role {
 	case villager
 	case werewolf
 	case guardianAngel
@@ -156,7 +156,7 @@ enum VictoryReason {
 	}
 }
 
-enum TimeOfYear {
+public enum TimeOfYear {
 	case earlySpring
 	case lateSpring
 	case earlySummer
@@ -232,6 +232,10 @@ public protocol Sendable {
 	func send(userSelection options: [UserID], id: String, label: String) async throws -> Message
 }
 
+public protocol I18nable {
+	func i18n() -> I18n
+}
+
 public extension Sendable {
 	func send(_ buttons: CommunicationButton...) async throws -> Message {
 		try await self.send(buttons)
@@ -252,7 +256,7 @@ public protocol Replyable {
 
 public protocol Communication {
 	associatedtype UserID
-	associatedtype Channel: Sendable where Channel.Message == Self.Message, Channel.UserID == Self.UserID
+	associatedtype Channel: Sendable & I18nable where Channel.Message == Self.Message, Channel.UserID == Self.UserID
 	associatedtype Message: Deletable
 	associatedtype Interaction: Replyable
 
@@ -262,8 +266,6 @@ public protocol Communication {
 	func onJoined(_: UserID, state: State<Self>) async throws
 	func onLeft(_: UserID, state: State<Self>) async throws
 }
-
-let i18n: I18n = English()
 
 public class State<Comm: Communication> {
 	enum Action: Equatable {
@@ -348,6 +350,8 @@ public class State<Comm: Communication> {
 
 	var nominatedBefore: Set<Comm.UserID> = []
 
+	var i18n: I18n
+
 	public init(for channel: Comm.Channel, in comm: Comm, eventLoop: EventLoop) {
 		self.channel = channel
 		self.comm = comm
@@ -357,6 +361,7 @@ public class State<Comm: Communication> {
 		self.nominationCondition = .init(for: eventLoop)
 		self.eventLoop = eventLoop
 		self.nominees = []
+		self.i18n = channel.i18n()
 	}
 
 	func resetNominationCondition() {

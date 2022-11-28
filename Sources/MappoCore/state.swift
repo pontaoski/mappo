@@ -855,43 +855,43 @@ public class State<Comm: Communication> {
 	public func join(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard state == .waiting || state == .assigned else {
 			if leaveQueue.contains(who) {
-				_ = try await interaction.reply(with: "You have left the leave queue! You will stay in the game", epheremal: true)
+				_ = try await interaction.reply(with: i18n.leaveLeaveQueue, epheremal: true)
 			} else {
 				joinQueue.insert(who)
-				_ = try await interaction.reply(with: "You have been added to the join queue! You will join when the current game is over", epheremal: true)
+				_ = try await interaction.reply(with: i18n.addedJoinQueue, epheremal: true)
 			}
 			return
 		}
 		guard !party.contains(who) else {
-			_ = try await interaction.reply(with: "You're already in the party!", epheremal: true)
+			_ = try await interaction.reply(with: i18n.alreadyInParty, epheremal: true)
 			return
 		}
 		try await comm.onJoined(who, state: self)
 		party.insert(who)
-		_ = try await interaction.reply(with: "You have joined the party!", epheremal: false)
+		_ = try await interaction.reply(with: i18n.joinedParty, epheremal: false)
 		if state == .assigned {
 			state = .waiting
-			_ = try await interaction.reply(with: "You need to setup again, since a new player joined", epheremal: true)
+			_ = try await interaction.reply(with: i18n.setupRequired, epheremal: true)
 		}
 	}
 	public func leave(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard state == .waiting else {
 			if joinQueue.contains(who) {
 				joinQueue.remove(who)
-				_ = try await interaction.reply(with: "You have left the leave queue", epheremal: true)
+				_ = try await interaction.reply(with: i18n.leaveJoinQueue, epheremal: true)
 			} else {
 				leaveQueue.insert(who)
-				_ = try await interaction.reply(with: "You have been added to the leave queue! You will leave when the current game is over", epheremal: true)
+				_ = try await interaction.reply(with: i18n.addedLeaveQueue, epheremal: true)
 			}
 			return
 		}
 		guard party.contains(who) else {
-			_ = try await interaction.reply(with: "You're not in the party!", epheremal: true)
+			_ = try await interaction.reply(with: i18n.notInParty, epheremal: true)
 			return
 		}
 		try await comm.onLeft(who, state: self)
 		party.remove(who)
-		try await interaction.reply(with: "You have left the party!", epheremal: false)
+		try await interaction.reply(with: i18n.leftParty, epheremal: false)
 	}
 	public func setup(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard state == .waiting || state == .assigned else {

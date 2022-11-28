@@ -33,7 +33,10 @@ class DiscordChannel: Sendable, I18nable {
 		self.channel = channel
 	}
 	func i18n() -> I18n {
-		English()
+		if channel.id == 1046573727732748359 || channel.id == 1014242493056962570 {
+			return TokiPona()
+		}
+		return English()
 	}
 	func send(_ text: String) async throws -> Message {
 		try await channel.send(text)!

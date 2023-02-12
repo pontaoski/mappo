@@ -431,13 +431,13 @@ public class State<Comm: Communication> {
 		for user in shuffle {
 			let dms = try await comm.getChannel(for: user, state: self)
 			let role = roles[user]!
-			_ = try await dms?.send(
-				CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role))
-			)
-			// do {
-			// } catch ResponseError.nonSuccessfulRequest(let code) where code.code == 50007 {
-			// 	_ = try await thread?.send("I can't DM <@\(user)>!")
-			// }
+			do {
+				_ = try await dms?.send(
+					CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role))
+				)
+			} catch {
+				_ = try await channel.send("I can't DM <@\(user)>! \(error)")
+			}
 		}
 	}
 

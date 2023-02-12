@@ -244,23 +244,28 @@ class MyBot {
 			payload: .init(type: .deferredChannelMessageWithSource)
 		)
 		let intr = DiscordInteraction(client: client, interaction: woot)
-		switch ev {
-		case .applicationCommand(let data):
-			try await slashCommandEvent(cmd: data.name, user: user, intr: intr)
-		case .messageComponent(let data):
-			switch data.componentType {
-			case .stringSelect:
-				guard let value = data.values?.first?.asString else {
-					return
+		do {
+			switch ev {
+			case .applicationCommand(let data):
+				try await slashCommandEvent(cmd: data.name, user: user, intr: intr)
+			case .messageComponent(let data):
+				switch data.componentType {
+				case .stringSelect:
+					guard let value = data.values?.first?.asString else {
+						return
+					}
+					try await selectMenuEvent(id: data.customID, target: value, user: user, intr: intr)
+				case .button:
+					try await buttonClickEvent(btn: data.customID, user: user, intr: intr)
+				default:
+					()
 				}
-				try await selectMenuEvent(id: data.customID, target: value, user: user, intr: intr)
-			case .button:
-				try await buttonClickEvent(btn: data.customID, user: user, intr: intr)
 			default:
 				()
 			}
-		default:
-			()
+		} catch {
+			print("Error in dispatching: \(error)")
+			_ = try await client.createMessage(channelId: intr.event.channel_id!, payload: .init(content: "I had an error: \(error)"))
 		}
 	}
 	func slashCommandEvent(cmd: String, user: DiscordUser, intr: DiscordInteraction) async throws {

@@ -125,15 +125,17 @@ class DiscordInteraction: Replyable {
 		self.event = interaction
 	}
 	func reply(with: String, epheremal: Bool) async throws {
-		_ = try await client.editInteractionResponse(
+		_ = try await client.createInteractionResponse(
+			id: event.id,
 			token: event.token,
-			payload: .init(content: with, flags: epheremal ? [.ephemeral] : [])
+			payload: .init(type: .channelMessageWithSource, data: .init(content: with, flags: epheremal ? [.ephemeral] : []))
 		)
 	}
 	func reply(with embed: CommunicationEmbed, epheremal: Bool) async throws {
-		_ = try await client.editInteractionResponse(
+		_ = try await client.createInteractionResponse(
+			id: event.id,
 			token: event.token,
-			payload: .init(embeds: [embed.discord], flags: epheremal ? [.ephemeral] : [])
+			payload: .init(type: .channelMessageWithSource, data: .init(embeds: [embed.discord], flags: epheremal ? [.ephemeral] : []))
 		)
 	}
 }
@@ -238,11 +240,11 @@ class MyBot {
 		guard let user = woot.member?.user ?? woot.user else {
 			return
 		}
-		_ = try await client.createInteractionResponse(
-			id: woot.id,
-			token: woot.token,
-			payload: .init(type: .deferredChannelMessageWithSource)
-		)
+		// _ = try await client.createInteractionResponse(
+		// 	id: woot.id,
+		// 	token: woot.token,
+		// 	payload: .init(type: .deferredChannelMessageWithSource)
+		// )
 		let intr = DiscordInteraction(client: client, interaction: woot)
 		do {
 			switch ev {

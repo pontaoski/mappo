@@ -40,7 +40,7 @@ commands = [
         "name": "language",
         "description": "The language to set the game",
         "required": True,
-        "type": 6,
+        "type": 3,
     }],"description":"Changes the game language","default_permission":True,"name":"language"},
 ]
 

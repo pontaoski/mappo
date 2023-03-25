@@ -540,6 +540,7 @@ public class State<Comm: Communication> {
 			if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
 				_ = try await thread?.send(i18n.exilingTitle(who: "<@\(nominee)>"))
 				_ = try await attemptKill(nominee, because: .exile)
+				try await nightStatus()
 				break
 			} else {
 				_ = try await thread?.send(i18n.notExilingTitle(who: "<@\(nominee)>"))

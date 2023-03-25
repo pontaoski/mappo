@@ -1005,7 +1005,7 @@ public class State<Comm: Communication> {
 	}
 	public func role(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
 		guard let role = Role.allCases.filter({ role in
-			i18n.roleName(role).contains(what.lowercased())
+			i18n.roleName(role).lowercased().contains(what.lowercased())
 		}).first else {
 			try await interaction.reply(with: "I couldn't find a role with that name!", epheremal: true)
 			return

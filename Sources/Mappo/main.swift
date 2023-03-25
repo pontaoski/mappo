@@ -292,6 +292,12 @@ class MyBot {
 				return
 			}
 			try await state.remove(who: user.id, target: val, interaction: intr)
+		case "language":
+			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
+				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
+				return
+			}
+			try await state.language(who: user.id, what: val, interaction: intr)
 		case "promote":
 			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
 				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)

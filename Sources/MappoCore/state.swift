@@ -24,7 +24,7 @@ public class ConditionVariable {
 		try await future.get()
 	}
 }
-enum Disposition {
+public enum Disposition {
 	case evil
 	case neutral
 	case good
@@ -119,7 +119,7 @@ public enum Role: CaseIterable {
 	static let evil: [Role] = [.werewolf, .cursed, .goose]
 }
 
-enum Team: Equatable {
+public enum Team: Equatable {
 	case village
 	case werewolf
 	case jester
@@ -201,11 +201,18 @@ public struct CommunicationEmbed {
 	public let title: String
 	public let body: String
 	public let color: Kind
+	public let fields: [Field]
 
-	public init(title: String = "", body: String = "", color: Kind = .info) {
+	public struct Field {
+		public let title: String
+		public let body: String
+	}
+
+	public init(title: String = "", body: String = "", color: Kind = .info, fields: [Field] = []) {
 		self.title = title
 		self.body = body
 		self.color = color
+		self.fields = fields
 	}
 }
 
@@ -896,6 +903,10 @@ public class State<Comm: Communication> {
 		try await interaction.reply(with: i18n.leftParty, epheremal: false)
 	}
 	public func setup(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard who == party.first else {
+			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			return
+		}
 		guard state == .waiting || state == .assigned else {
 			try await interaction.reply(with: "A game is already in progress!", epheremal: false)
 			return
@@ -923,6 +934,10 @@ public class State<Comm: Communication> {
 		)
 	}
 	public func start(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard who == party.first else {
+			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			return
+		}
 		guard state != .playing else {
 			try await interaction.reply(with: "A game is already in progress", epheremal: true)
 			return
@@ -952,11 +967,11 @@ public class State<Comm: Communication> {
 			return
 		}
 		guard state == .waiting else {
-			if joinQueue.contains(who) {
-				joinQueue.remove(who)
+			if joinQueue.contains(target) {
+				joinQueue.remove(target)
 				_ = try await interaction.reply(with: i18n.leaveJoinQueue, epheremal: true)
 			} else if party.contains(target) {
-				leaveQueue.insert(who)
+				leaveQueue.insert(target)
 				_ = try await interaction.reply(with: i18n.addedLeaveQueue, epheremal: true)
 			} else {
 				try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
@@ -967,9 +982,25 @@ public class State<Comm: Communication> {
 			try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
 			return
 		}
-		try await comm.onLeft(who, state: self)
-		party.remove(who)
+		try await comm.onLeft(target, state: self)
+		party.remove(target)
 		try await interaction.reply(with: "<@\(target)> has been removed from the party!", epheremal: false)
+	}
+	public func language(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
+		guard who == party.first else {
+			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			return
+		}
+		switch what {
+		case "toki pona", "tpo", "tok", "toki", "pona", "tokipona":
+			i18n = TokiPona()
+			try await interaction.reply(with: "toki musi li toki pona!", epheremal: true)
+		case "english", "en":
+			i18n = English()
+			try await interaction.reply(with: "The game language is English!", epheremal: true)
+		default:
+			try await interaction.reply(with: "I don't know that language!", epheremal: true)
+		}
 	}
 	public func role(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
 		guard let role = Role.allCases.filter({ role in
@@ -979,7 +1010,17 @@ public class State<Comm: Communication> {
 			return
 		}
 
-		try await interaction.reply(with: CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role), color: .info), epheremal: true)
+		try await interaction.reply(with: CommunicationEmbed(
+			title: i18n.roleName(role),
+			body: i18n.roleDescription(role),
+			color: .info,
+			fields: [
+				.init(title: "Minimum Player Count", body: "\(role.minimumPlayerCount)"),
+				.init(title: "Maximum Role Count", body: "\(role.absoluteMax)"),
+				.init(title: "Disposition", body: i18n.dispositionName(role.disposition)),
+				.init(title: "Team", body: i18n.teamName(role.defaultTeam)),
+			]
+		), epheremal: true)
 	}
 	public func sendRoles(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		let roles = Role.allCases.map{ i18n.roleName($0) }.map{ "- \($0)" }.joined(separator: "\n")

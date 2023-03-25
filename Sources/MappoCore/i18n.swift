@@ -1,5 +1,7 @@
 public protocol I18n {
     func roleName(_ role: Role) -> String
+	func teamName(_ team: Team) -> String
+	func dispositionName(_ disposition: Disposition) -> String
     func roleDescription(_ role: Role) -> String
     func timeOfYear(_ toy: TimeOfYear) -> String
     func nightTitle(_ toy: TimeOfYear, year: Int, day: Int) -> String
@@ -217,6 +219,26 @@ public struct English: I18n {
 			return "Cursed"
         }
     }
+	public func teamName(_ team: Team) -> String {
+		switch team {
+		case .jester:
+			return "Jester"
+		case .village:
+			return "Village"
+		case .werewolf:
+			return "Werewolf"
+		}
+	}
+	public func dispositionName(_ disposition: Disposition) -> String {
+		switch disposition {
+		case .evil:
+			return "Evil"
+		case .good:
+			return "Good"
+		case .neutral:
+			return "Neutral"
+		}
+	}
 }
 
 public struct TokiPona: I18n {
@@ -378,5 +400,25 @@ public struct TokiPona: I18n {
 			return "jan pi kama ike"
         }
     }
+	public func teamName(_ team: Team) -> String {
+		switch team {
+		case .jester:
+			return "jan nasa"
+		case .village:
+			return "ma tomo"
+		case .werewolf:
+			return "soweli mun"
+		}
+	}
+	public func dispositionName(_ disposition: Disposition) -> String {
+		switch disposition {
+		case .evil:
+			return "ike"
+		case .good:
+			return "pona"
+		case .neutral:
+			return "ala"
+		}
+	}
 }
 

@@ -695,7 +695,7 @@ public class State<Comm: Communication> {
 				_ = try await thread?.send(CommunicationEmbed(body: "... but a Guardian Angel protects them!", color: .good))
 			} else if actions.contains(where: { $0.key == who && $0.value.awayFromHome && $0.value.isValid(doer: $0.key, with: actions.values) }) {
 				_ = try await thread?.send(CommunicationEmbed(body: "... but they were away from home!", color: .good))
-			} else if Double.random(in: 0...1) > werewolfKillSuccessRate {
+			} else if Double.random(in: 0...1) < werewolfKillSuccessRate {
 				_ = try await thread?.send(CommunicationEmbed(body: "... and succeed!", color: .bad))
 				try await kill(who, because: why)
 			} else {

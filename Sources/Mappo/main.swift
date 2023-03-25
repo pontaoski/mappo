@@ -249,7 +249,7 @@ class MyBot {
 		do {
 			switch ev {
 			case .applicationCommand(let data):
-				try await slashCommandEvent(cmd: data.name, user: user, intr: intr)
+				try await slashCommandEvent(cmd: data.name, user: user, opts: data.options, intr: intr)
 			case .messageComponent(let data):
 				switch data.componentType {
 				case .stringSelect:
@@ -270,7 +270,7 @@ class MyBot {
 			_ = try await client.createMessage(channelId: intr.event.channel_id!, payload: .init(content: "I had an error: \(error)"))
 		}
 	}
-	func slashCommandEvent(cmd: String, user: DiscordUser, intr: DiscordInteraction) async throws {
+	func slashCommandEvent(cmd: String, user: DiscordUser, opts: [Interaction.ApplicationCommandData.Option]?, intr: DiscordInteraction) async throws {
 		let state = try await self.state(for: intr.event.channel_id!)
 
 		switch cmd {
@@ -286,6 +286,26 @@ class MyBot {
 			try await state.unsetup(who: user.id, interaction: intr)
 		case "start":
 			try await state.start(who: user.id, interaction: intr)
+		case "remove":
+			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
+				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
+				return
+			}
+			try await state.remove(who: user.id, target: val, interaction: intr)
+		case "promote":
+			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
+				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
+				return
+			}
+			try await state.promote(who: user.id, target: val, interaction: intr)
+		case "role":
+			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
+				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
+				return
+			}
+			try await state.role(who: user.id, what: val, interaction: intr)
+		case "roles":
+			try await state.sendRoles(who: user.id, interaction: intr)
 		default:
 			return
 		}

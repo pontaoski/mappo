@@ -15,13 +15,14 @@ let package = Package(
         .package(url: "https://github.com/rexmas/JSONValue.git", from: "7.0.0"),
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.13.3"),
         .package(url: "https://github.com/pontaoski/DiscordKit.git", branch: "main"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.0.4"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "MappoCore",
-            dependencies: [.product(name: "AsyncKit", package: "async-kit")]
+            dependencies: [.product(name: "AsyncKit", package: "async-kit"), .product(name: "Collections", package: "swift-collections")]
         ),
         .executableTarget(
             name: "Mappo",

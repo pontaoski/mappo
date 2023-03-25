@@ -1,4 +1,6 @@
 import NIO
+import OrderedCollections
+import Foundation
 
 public class ConditionVariable {
 	let promise: EventLoopPromise<Void>
@@ -27,7 +29,7 @@ enum Disposition {
 	case neutral
 	case good
 }
-public enum Role {
+public enum Role: CaseIterable {
 	case villager
 	case werewolf
 	case guardianAngel
@@ -309,7 +311,7 @@ public class State<Comm: Communication> {
 	var thread: Comm.Channel?
 
 	// who's playing?
-	var party: Set<Comm.UserID> = []
+	var party: OrderedSet<Comm.UserID> = []
 
 	// who's ready to nominate?
 	// player -> nominate or skip
@@ -449,7 +451,7 @@ public class State<Comm: Communication> {
 		let incoming = joinQueue.map { "<@\($0)>" }.joined(separator: "\n")
 		let outgoing = leaveQueue.map { "<@\($0)>" }.joined(separator: "\n")
 		for user in joinQueue {
-			party.insert(user)
+			party.append(user)
 			try await comm.onJoined(user, state: self)
 		}
 		for user in leaveQueue {
@@ -597,10 +599,10 @@ public class State<Comm: Communication> {
 				let menu: Set<Comm.UserID>
 				if self.timeOfYear == .earlyWinter || self.timeOfYear == .lateWinter {
 					_ = try await dm.send(CommunicationEmbed(title: i18n.winterWolfAction))
-					menu = party.filter { $0 != user }.filter { alive[$0]! }.filter { roles[$0]?.disposition != .evil }
+					menu = Set(party.filter { $0 != user }.filter { alive[$0]! }.filter { roles[$0]?.disposition != .evil })
 				} else {
 					_ = try await dm.send(CommunicationEmbed(title: i18n.normalWolfAction))
-					menu = party.filter { alive[$0]! }.filter { $0 == user || roles[$0]?.disposition != .evil }
+					menu = Set(party.filter { alive[$0]! }.filter { $0 == user || roles[$0]?.disposition != .evil })
 				}
 				actionMessages[user] = try await dm.send(userSelection: menu, id: "werewolf-kill", label: "")
 			case .guardianAngel:
@@ -867,7 +869,7 @@ public class State<Comm: Communication> {
 			return
 		}
 		try await comm.onJoined(who, state: self)
-		party.insert(who)
+		party.append(who)
 		_ = try await interaction.reply(with: i18n.joinedParty, epheremal: false)
 		if state == .assigned {
 			state = .waiting
@@ -931,6 +933,58 @@ public class State<Comm: Communication> {
 		}
 		try await interaction.reply(with: "A game has been started!", epheremal: true)
 		try await startPlaying()
+	}
+	public func promote(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard who == party.first else {
+			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			return
+		}
+		guard party.contains(target) else {
+			try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
+			return
+		}
+		party.swapAt(party.firstIndex(of: who)!, party.firstIndex(of: target)!)
+		try await interaction.reply(with: "<@\(target)> has been promoted to party leader!", epheremal: false)
+	}
+	public func remove(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard who == party.first else {
+			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			return
+		}
+		guard state == .waiting else {
+			if joinQueue.contains(who) {
+				joinQueue.remove(who)
+				_ = try await interaction.reply(with: i18n.leaveJoinQueue, epheremal: true)
+			} else if party.contains(target) {
+				leaveQueue.insert(who)
+				_ = try await interaction.reply(with: i18n.addedLeaveQueue, epheremal: true)
+			} else {
+				try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
+			}
+			return
+		}
+		guard party.contains(target) else {
+			try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
+			return
+		}
+		try await comm.onLeft(who, state: self)
+		party.remove(who)
+		try await interaction.reply(with: "<@\(target)> has been removed from the party!", epheremal: false)
+	}
+	public func role(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
+		guard let role = Role.allCases.filter({ role in
+			i18n.roleName(role).contains(what.lowercased())
+		}).first else {
+			try await interaction.reply(with: "I couldn't find a role with that name!", epheremal: true)
+			return
+		}
+
+		try await interaction.reply(with: CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role), color: .info), epheremal: true)
+	}
+	public func sendRoles(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		let roles = Role.allCases.map{ i18n.roleName($0) }.map{ "- \($0)" }.joined(separator: "\n")
+
+		try await interaction.reply(with: CommunicationEmbed(title: "Roles", body: roles, color: .info), epheremal: true)
 	}
 
 	// interaction implementations

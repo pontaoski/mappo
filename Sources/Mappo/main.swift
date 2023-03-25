@@ -12,11 +12,11 @@ extension CommunicationEmbed {
 	var discord: Embed {
 		switch self.color {
 		case .bad:
-			return .init(title: self.title, description: self.body, color: 0xFF0000)
+			return .init(title: self.title, description: self.body, color: 0xFF0000, fields: self.fields.map { .init(name: $0.title, value: $0.body, inline: true)})
 		case .good:
-			return .init(title: self.title, description: self.body, color: 0x11FF11)
+			return .init(title: self.title, description: self.body, color: 0x11FF11, fields: self.fields.map { .init(name: $0.title, value: $0.body, inline: true)})
 		case .info:
-			return .init(title: self.title, description: self.body, color: 0x3DAEE9)
+			return .init(title: self.title, description: self.body, color: 0x3DAEE9, fields: self.fields.map { .init(name: $0.title, value: $0.body, inline: true)})
 		}
 	}
 }

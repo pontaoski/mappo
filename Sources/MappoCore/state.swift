@@ -774,6 +774,7 @@ public class State<Comm: Communication> {
 			if actions.values.contains(.freeze(who: action.key)) {
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				_ = try await dm?.send(CommunicationEmbed(body: "A werewolf froze you, therefore you couldn't do anything tonight!", color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: "A werewolf froze someone tonight!", color: .bad))
 				continue
 			}
 			switch action.value {

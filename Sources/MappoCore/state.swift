@@ -1100,7 +1100,7 @@ public class State<Comm: Communication> {
 		}
 
 		_ = try await interaction.reply(with: "You've voted to skip!", epheremal: true)
-		readyToNominate[who] = nil
+		readyToNominate[who] = nil as Comm.UserID?
 		_ = try await thread?.send("<@\(who)> has voted to skip!")
 		checkNominationCondition()
 	}

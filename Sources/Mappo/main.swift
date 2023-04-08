@@ -109,7 +109,7 @@ class DiscordChannel: Sendable, I18nable {
 			payload: .init(
 				components: [.init(components: [.stringSelect(.init(custom_id: id, options: doptions.map { (id, name) in
 					return .init(label: name, value: id)
-				}))] + buttons.map(convertButton))]
+				}))]), .init(components: buttons.map(convertButton))]
 			)
 		)
 		let msg = try it.decode()

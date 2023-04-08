@@ -1075,6 +1075,7 @@ public class State<Comm: Communication> {
 		}
 		nominatedBefore.insert(target)
 		_ = try await thread?.send("<@\(who)> has nominated <@\(target)>!")
+		checkNominationCondition()
 	}
 	public func goose(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard alive[who] == true && roles[who] == .goose else {
@@ -1083,6 +1084,12 @@ public class State<Comm: Communication> {
 		}
 		try await interaction.reply(with: "You're going to give goose <@\(target)> tonight!", epheremal: false)
 		actions[who] = .goose(who: target)
+	}
+
+	func checkNominationCondition() {
+		if readyToNominate.count > party.filter({alive[$0]!}).count * (3/4) {
+			nominationCondition.release()
+		}
 	}
 
 	// button implementations
@@ -1095,6 +1102,7 @@ public class State<Comm: Communication> {
 		_ = try await interaction.reply(with: "You've voted to skip!", epheremal: true)
 		readyToNominate[who] = nil
 		_ = try await thread?.send("<@\(who)> has voted to skip!")
+		checkNominationCondition()
 	}
 	public func voteYes(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard alive[who] == true else {

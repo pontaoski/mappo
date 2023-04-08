@@ -1087,7 +1087,7 @@ public class State<Comm: Communication> {
 	}
 
 	func checkNominationCondition() {
-		if readyToNominate.count > party.filter({alive[$0]!}).count * (3/4) {
+		if readyToNominate.count > (party.filter({alive[$0]!}).count * 3)/4 {
 			nominationCondition.release()
 		}
 	}

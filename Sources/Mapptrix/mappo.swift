@@ -47,12 +47,16 @@ class MatrixChannel: Sendable, I18nable {
 		return MatrixMessage(client: client, room: room, messageID: msg)
 	}
 
-	func send(userSelection options: [UserID], id: String, label: String) async throws -> Message {
+	func send(userSelection options: [UserID], id: String, label: String, buttons: [CommunicationButton]) async throws -> Message {
 		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML)</h4>\n"
 		let plainPrefix = "\(label.replacingMentionsWithPlaintext)\n\n"
 
-		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0])'>\(options[$0])</a>: send m?\(id) \($0)" }.joined(separator: "<br>")
-		let plainBody = options.indices.map { "\(options[$0]): send m?\(id) \($0)" }.joined(separator: "\n")
+		let mappedBtn = buttons.map { "\($0.label): send m!\($0.id)" }
+		let htmlBodyBtn = mappedBtn.joined(separator: "<br>")
+		let plainBodyBtn = mappedBtn.joined(separator: "\n")
+
+		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0])'>\(options[$0])</a>: send m?\(id) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
+		let plainBody = options.indices.map { "\(options[$0]): send m?\(id) \($0)" }.joined(separator: "\n") + plainBodyBtn
 
 		activeSelections[room] = options
 
@@ -202,10 +206,8 @@ final class MatrixMappo {
 				return // TODO: not in game
 			}
 			switch content.body.dropFirst(2) {
-			case "nominate-yes":
-				try await state.nominateYes(who: event.sender!, interaction: message)
-			case "nominate-no":
-				try await state.nominateNo(who: event.sender!, interaction: message)
+			case "nominate-skip":
+				try await state.nominateSkip(who: event.sender!, interaction: message)
 			case "vote-yes":
 				try await state.voteYes(who: event.sender!, interaction: message)
 			case "vote-no":

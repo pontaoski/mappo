@@ -21,13 +21,10 @@ public protocol I18n {
     var villagersGather: String { get }
     var itIsDaytime: String { get }
 	var eveningDraws: String { get }
-	var nominateYes: String { get }
-	var nominateNo: String { get }
-	var duskDrawsNobody: String { get }
-	var duskDrawsNominating: String { get }
-	var nominationTime: String { get }
+	var nominateSkip: String { get }
+	var duskDrawsSkip: String { get }
+	var duskDrawsVoting: String { get }
 	var nominationTitle: String { get }
-	var noNominations: String { get }
 	var voteYes: String { get }
 	var voteNo: String { get }
 	var timeToBed: String { get }
@@ -66,14 +63,11 @@ public struct English: I18n {
     public let nightHasFallen = "Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!"
     public let villagersGather = "The villagers gather the next morning in the village center."
     public let itIsDaytime = "It is now day time. All of you have at least 30 seconds to make your accusations, defenses, claim roles, or just talk."
-    public let eveningDraws = "Evening draws near, and it's now possible to start or skip nominations. Nominations will start or be skipped once a majority of people have indicated to do so."
-    public let nominateYes = "Nominate Someone"
-    public let nominateNo = "Don't Nominate Someone"
-    public let duskDrawsNobody = "Dusk draws near, and it looks like nobody's getting nominated tonight..."
-    public let duskDrawsNominating = "Dusk draws near, and the villagers gather to decide who they are nominating this evening..."
-    public let nominationTime = "Everyone has 15 seconds to nominate someone!"
+    public let eveningDraws = "Evening draws near, and it's now possible to nominate people (or skip). We will proceed when 3/4th of villagers have decided."
+    public let nominateSkip = "Skip Nominations"
+    public let duskDrawsSkip = "The people have decided to skip voting tonight."
+    public let duskDrawsVoting = "It's getting dark... let's go through the nominations!"
     public let nominationTitle = "Nominate people (or don't!)"
-    public let noNominations = "Oops, doesn't look like there's any nominees tonight... Off to bed it is, then."
     public let voteYes = "Yes"
     public let voteNo = "No"
     public let timeToBed = "Dusk draws near, and it's time to get to bed... A little more discussion time (25 seconds) for you before that, though!"
@@ -248,13 +242,10 @@ public struct TokiPona: I18n {
     public let villagersGather = "tenpo suno la, jan li kama lon tomo toki."
     public let itIsDaytime = "sina ale li jo e tenpo lili tawa ni: toki utala, toki awen, toki pi pali sina, anu toki pona."
     public let eveningDraws = "tenpo pimeja li kama la, sina ken open weka e jan. jan mute li wile la, sina ken alasa weka e jan."
-    public let nominateYes = "alasa weka"
-    public let nominateNo = "alasa ala weka"
-    public let duskDrawsNobody = "tenpo pimeja li kama la, jan ala li kama weka..."
-    public let duskDrawsNominating = "tenpo pimeja li kama la, jan li kama tawa ni: ona li alasa e jan pi wile weka..."
-    public let nominationTime = "sina ken pana e jan pi wile weka sina!"
+    public let nominateSkip = "alasa ala weka"
+    public let duskDrawsSkip = "kulupu li wile ala alasa weka."
+    public let duskDrawsVoting = "tenpo mun li kama la, mi o open alasa weka a!"
     public let nominationTitle = "o alasa weka e jan (anu weka ala!)"
-    public let noNominations = "ike a, jan ala li pana e jan pi wile weka... ni la, o lape pona"
     public let voteYes = "wile"
     public let voteNo = "wile ala"
     public let timeToBed = "tenpo pimeja en tenpo lape li kama... taso, sina ken awen toki lon tenpo lili!"

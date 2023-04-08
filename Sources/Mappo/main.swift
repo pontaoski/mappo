@@ -66,30 +66,31 @@ class DiscordChannel: Sendable, I18nable {
 		let msg = try it.decode()
 		return Message(client: client, channelID: channelID, messageID: msg.id)
 	}
+	private func convertButton(_ btn: CommunicationButton) -> Interaction.ActionRow.Component {
+		let style: Interaction.ActionRow.Button.Style
+		switch btn.color {
+		case .bad:
+			style = .danger
+		case .good:
+			style = .success
+		case .bright:
+			style = .primary
+		case .neutral:
+			style = .secondary
+		}
+		return .button(.init(style: style, label: btn.label, custom_id: btn.id))
+	}
 	func send(_ buttons: [CommunicationButton]) async throws -> Message {
 		let it = try await client.createMessage(
 			channelId: channelID,
 			payload: .init(
-				components: [.init(components: buttons.map { btn in
-					let style: Interaction.ActionRow.Button.Style
-					switch btn.color {
-					case .bad:
-						style = .danger
-					case .good:
-						style = .success
-					case .bright:
-						style = .primary
-					case .neutral:
-						style = .secondary
-					}
-					return .button(.init(style: style, label: btn.label, custom_id: btn.id))
-				})]
+				components: [.init(components: buttons.map(convertButton))]
 			)
 		)
 		let msg = try it.decode()
 		return Message(client: client, channelID: channelID, messageID: msg.id)
 	}
-	func send(userSelection options: [UserID], id: String, label: String) async throws -> Message {
+	func send(userSelection options: [UserID], id: String, label: String, buttons: [CommunicationButton]) async throws -> Message {
 		var doptions: [(UserID, String)] = []
 		for opt in options {
 			if let member = await cache.guilds[guildID]?.member(withUserId: opt), let nick = member.nick ?? member.user?.username {
@@ -108,7 +109,7 @@ class DiscordChannel: Sendable, I18nable {
 			payload: .init(
 				components: [.init(components: [.stringSelect(.init(custom_id: id, options: doptions.map { (id, name) in
 					return .init(label: name, value: id)
-				}))])]
+				}))] + buttons.map(convertButton))]
 			)
 		)
 		let msg = try it.decode()
@@ -351,10 +352,8 @@ class MyBot {
 		}
 
 		switch btn {
-		case "nominate-yes":
-			try await state.nominateYes(who: user.id, interaction: intr)
-		case "nominate-no":
-			try await state.nominateNo(who: user.id, interaction: intr)
+		case "nominate-skip":
+			try await state.nominateSkip(who: user.id, interaction: intr)
 		case "vote-yes":
 			try await state.voteYes(who: user.id, interaction: intr)
 		case "vote-no":

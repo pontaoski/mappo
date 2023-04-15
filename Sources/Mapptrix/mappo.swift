@@ -205,15 +205,8 @@ final class MatrixMappo {
 			guard let state = users[event.sender!] else {
 				return // TODO: not in game
 			}
-			switch content.body.dropFirst(2) {
-			case "nominate-skip":
-				try await state.nominateSkip(who: event.sender!, interaction: message)
-			case "vote-yes":
-				try await state.voteYes(who: event.sender!, interaction: message)
-			case "vote-no":
-				try await state.voteNo(who: event.sender!, interaction: message)
-			default:
-				break
+			if let button = state.buttons[String(content.body.dropFirst(2))] {
+				try await button(state)(event.sender!, message)
 			}
 			break
 		case "m?": // user selection
@@ -230,39 +223,14 @@ final class MatrixMappo {
 			guard let target = activeSelections[event.roomID!]?[num] else {
 				return // TODO: complain about invalid selection
 			}
-			switch split[0] {
-			case "werewolf-kill":
-				try await state.werewolfKill(who: event.sender!, target: target, interaction: message)
-			case "guardianAngel-protect":
-				try await state.guardianAngelProtect(who: event.sender!, target: target, interaction: message)
-			case "seer-investigate":
-				try await state.seerInvestigate(who: event.sender!, target: target, interaction: message)
-			case "cookies-give":
-				try await state.cookiesGive(who: event.sender!, target: target, interaction: message)
-			case "nominate":
-				try await state.nominate(who: event.sender!, target: target, interaction: message)
-			case "goose":
-				try await state.goose(who: event.sender!, target: target, interaction: message)
-			default:
-				break
+			if let dropdown = state.userDropdowns[String(split[0])] {
+				try await dropdown(state)(event.sender!, target, message)
 			}
 			break
 		case "m.":
-			switch content.body.dropFirst(2) {
-			case "join":
-				try await event.state.join(who: event.sender!, interaction: message)
-			case "leave":
-				try await event.state.leave(who: event.sender!, interaction: message)
-			case "party":
-				try await event.state.party(who: event.sender!, interaction: message)
-			case "setup":
-				try await event.state.setup(who: event.sender!, interaction: message)
-			case "unsetup":
-				try await event.state.unsetup(who: event.sender!, interaction: message)
-			case "start":
-				try await event.state.start(who: event.sender!, interaction: message)
-			default:
-				break
+			let command = String(content.body.dropFirst(2))
+			if let cmd = event.state.arglessCommands[command] {
+				try await cmd(event.state)(event.sender!, message)
 			}
 			break
 		default:

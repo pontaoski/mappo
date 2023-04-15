@@ -34,10 +34,12 @@ public protocol I18n {
 	var normalWolfAction: String { get }
 	var gaAction: String { get }
 	var seerAction: String { get }
+	var oracleAction: String { get }
 	var cpAction: String { get }
 	var gooseAction: String { get }
 	var gaPrompt: String { get }
 	var seerPrompt: String { get }
+	var oraclePrompt: String { get }
 	var cpPrompt: String { get }
 	var goosePrompt: String { get }	
 	var drWerewolf: String { get }
@@ -77,10 +79,12 @@ public struct English: I18n {
 	public let normalWolfAction = "Time to kill someone tonight!"
 	public let gaAction = "Time to protect someone tonight!"
 	public let seerAction = "Time to see someone tonight!"
+	public let oracleAction = "Time to ponder someone tonight!"
 	public let cpAction = "Time to visit someone tonight!"
 	public let gooseAction = "Time to goose someone tonight!"
 	public let gaPrompt = "Choose someone to protect"
 	public let seerPrompt = "Choose someone to see their role"
+	public let oraclePrompt = "Choose someone to see what role they are not (from roles that are in the game)"
 	public let cpPrompt = "Choose someone to visit during the night and give them cookies"
 	public let goosePrompt = "Choose someone to goose tonight!"
 	public let drWerewolf = "You were killed by a werewolf!"
@@ -183,6 +187,8 @@ public struct English: I18n {
 			return "You only want to see one thing: to see the world burn. Every night, you choose someone neutral or good to goose. For that night, if they take a night action, they'll target a random person instead."
 		case .cursed:
 			return "You are cursed! You appear as a villager to the seer, but, when the werewolf dies, you become a werewolf!"
+		case .oracle:
+			return "You are blessed by the deities with the gift of divination. Every night, you can choose a player. You will be told what role that player is *not*."
         }
     }
     public func roleName(_ role: Role) -> String {
@@ -211,6 +217,8 @@ public struct English: I18n {
 			return "Goose"
 		case .cursed:
 			return "Cursed"
+		case .oracle:
+			return "Oracle"
         }
     }
 	public func teamName(_ team: Team) -> String {
@@ -255,10 +263,12 @@ public struct TokiPona: I18n {
 	public let normalWolfAction = "o moli e jan!"
 	public let gaAction = "o awen e jan!"
 	public let seerAction = "o sona e jan!"
+	public let oracleAction = "o sona e pali ala jan!"
 	public let cpAction = "o pan e jan!"
 	public let gooseAction = "o waso e jan!"
 	public let gaPrompt = "sina wile awen e jan seme?"
 	public let seerPrompt = "sina wile sona e pali pi jan seme?"
+	public let oraclePrompt = "sina wile sona e pali ala pi jan seme?"
 	public let cpPrompt = "sina wile pana e pan tawa jan seme?"
 	public let goosePrompt = "sina wile waso e jan seme?"
 	public let drWerewolf = "soweli mun li moli e sina!"
@@ -361,6 +371,8 @@ public struct TokiPona: I18n {
 			return "sina wile lukin e ni taso: ale li kama pakala. tenpo pimeja la, sina wile e jan pi ike ala. tenpo pimeja ni la, ona li pali pi wile ona ala."
 		case .cursed:
 			return "sina jan pi kama ike! jan lukin li lukin e ni: sina jan pi pali ala. taso, soweli mun li moli la, sina kama soweli mun!"
+		case .oracle:
+			return "wawa sewi li pana e ken ni tawa sina: sina sona e pali ala jan. (pali toki li lon musi.)"
         }
     }
     public func roleName(_ role: Role) -> String {
@@ -389,6 +401,8 @@ public struct TokiPona: I18n {
 			return "waso"
 		case .cursed:
 			return "jan pi kama ike"
+		case .oracle:
+			return "jan oko"
         }
     }
 	public func teamName(_ team: Team) -> String {

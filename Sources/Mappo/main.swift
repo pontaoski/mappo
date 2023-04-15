@@ -274,47 +274,22 @@ class MyBot {
 	func slashCommandEvent(cmd: String, user: DiscordUser, opts: [Interaction.ApplicationCommandData.Option]?, intr: DiscordInteraction) async throws {
 		let state = try await self.state(for: intr.event.channel_id!)
 
-		switch cmd {
-		case "join":
-			try await state.join(who: user.id, interaction: intr)
-		case "leave":
-			try await state.leave(who: user.id, interaction: intr)
-		case "party":
-			try await state.party(who: user.id, interaction: intr)
-		case "setup":
-			try await state.setup(who: user.id, interaction: intr)
-		case "unsetup":
-			try await state.unsetup(who: user.id, interaction: intr)
-		case "start":
-			try await state.start(who: user.id, interaction: intr)
-		case "remove":
+		if let command = state.arglessCommands[cmd] {
+			try await command(state)(user.id, intr)
+		} else if let command = state.stringCommands[cmd] {
 			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
 				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
 				return
 			}
-			try await state.remove(who: user.id, target: val, interaction: intr)
-		case "language":
+			try await command(state)(user.id, val, intr)
+		} else if let command = state.userCommands[cmd] {
 			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
 				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
 				return
 			}
-			try await state.language(who: user.id, what: val, interaction: intr)
-		case "promote":
-			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
-				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
-				return
-			}
-			try await state.promote(who: user.id, target: val, interaction: intr)
-		case "role":
-			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
-				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
-				return
-			}
-			try await state.role(who: user.id, what: val, interaction: intr)
-		case "roles":
-			try await state.sendRoles(who: user.id, interaction: intr)
-		default:
-			return
+			try await command(state)(user.id, val, intr)
+		} else {
+			try await intr.reply(with: "Oops, I don't understand what you just did (\(cmd)). Sorry.", epheremal: true)
 		}
 	}
 	func selectMenuEvent(id: String, target: String, user: DiscordUser, intr: DiscordInteraction) async throws {
@@ -328,21 +303,10 @@ class MyBot {
 			return
 		}
 
-		switch id {
-		case "werewolf-kill":
-			try await state.werewolfKill(who: user.id, target: target, interaction: intr)
-		case "guardianAngel-protect":
-			try await state.guardianAngelProtect(who: user.id, target: target, interaction: intr)
-		case "seer-investigate":
-			try await state.seerInvestigate(who: user.id, target: target, interaction: intr)
-		case "cookies-give":
-			try await state.cookiesGive(who: user.id, target: target, interaction: intr)
-		case "nominate":
-			try await state.nominate(who: user.id, target: target, interaction: intr)
-		case "goose":
-			try await state.goose(who: user.id, target: target, interaction: intr)
-		default:
-			try await intr.reply(with: "Oops, I don't understand what you just did. Sorry.", epheremal: true)
+		if let dropdown = state.userDropdowns[id] {
+			try await dropdown(state)(user.id, target, intr)
+		} else {
+			try await intr.reply(with: "Oops, I don't understand what you just did (\(id)). Sorry.", epheremal: true)
 		}
 	}
 	func buttonClickEvent(btn: String, user: DiscordUser, intr: DiscordInteraction) async throws {
@@ -351,15 +315,10 @@ class MyBot {
 			return
 		}
 
-		switch btn {
-		case "nominate-skip":
-			try await state.nominateSkip(who: user.id, interaction: intr)
-		case "vote-yes":
-			try await state.voteYes(who: user.id, interaction: intr)
-		case "vote-no":
-			try await state.voteNo(who: user.id, interaction: intr)
-		default:
-			_ = try? await intr.reply(with: "Oops, I don't understand which button you pressed...", epheremal: true)
+		if let button = state.buttons[btn] {
+			try await button(state)(user.id, intr)
+		} else {
+			try await intr.reply(with: "Oops, I don't understand what you just did (\(btn)). Sorry.", epheremal: true)
 		}
 	}
 }

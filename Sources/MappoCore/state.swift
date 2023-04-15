@@ -43,6 +43,9 @@ public enum Role: CaseIterable {
 	case goose
 	case cursed
 	case oracle
+	case laundryperson
+	case gossip
+	case librarian
 
 	func appearsAs(to: Role) -> Role {
 		switch (self, to) {
@@ -88,7 +91,7 @@ public enum Role: CaseIterable {
 
 	var absoluteMax: Int {
 		switch self {
-		case .guardianAngel, .seer, .oracle, .beholder, .jester, .cookiePerson, .innocent, .pacifist, .cursed:
+		case .guardianAngel, .seer, .oracle, .beholder, .jester, .cookiePerson, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian:
 			return 1
 		case .furry:
 			return 2
@@ -108,7 +111,7 @@ public enum Role: CaseIterable {
 		switch self {
 		case .guardianAngel, .seer, .oracle, .beholder, .pacifist:
 			return .good
-		case .villager, .jester, .cookiePerson, .furry, .innocent:
+		case .villager, .jester, .cookiePerson, .furry, .innocent, .laundryperson, .gossip, .librarian:
 			return .neutral
 		case .werewolf, .cursed, .goose:
 			return .evil
@@ -565,6 +568,19 @@ public class State<Comm: Communication> {
 			case .beholder:
 				let seer = roles.filter { $0.value == .seer }[0]
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.beholderSeer(who: "\(seer.key)")))
+			case .laundryperson:
+				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .good || roles[$0]!.disposition == .neutral }.randomElement()!
+				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
+				_ = try await dm?.send(CommunicationEmbed(body: "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."))
+			case .gossip:
+				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
+				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
+				let player3 = party.filter{$0 != user && $0 != player1 && $0 != player2}.randomElement()!
+				_ = try await dm?.send(CommunicationEmbed(body: "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"))
+			case .librarian:
+				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
+				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
+				_ = try await dm?.send(CommunicationEmbed(body: "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."))
 			default:
 				break
 			}
@@ -597,7 +613,7 @@ public class State<Comm: Communication> {
 				continue
 			}
 			switch roles[user]! {
-			case .villager, .jester, .beholder, .furry, .innocent, .pacifist, .cursed:
+			case .villager, .jester, .beholder, .furry, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian:
 				break
 			case .werewolf:
 				let menu: Set<Comm.UserID>

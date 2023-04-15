@@ -189,7 +189,13 @@ public struct English: I18n {
 			return "You are cursed! You appear as a villager to the seer, but, when the werewolf dies, you become a werewolf!"
 		case .oracle:
 			return "You are blessed by the deities with the gift of divination. Every night, you can choose a player. You will be told what role that player is *not*."
-        }
+		case .laundryperson:
+			return "You work the town's laundry, and realise that one of your clients left a doohickey in a basket for two. At the start of the game, you know that 1 of 2 players is a particular neutral or good role."
+		case .gossip:
+			return "You love to gossip! With your social savvy, you realise that one of three people in your favourite gossip circle is evil!"
+		case .librarian:
+			return "You're the sole person in the town's library. One of your recent patrons checked out an evil book, but you can't remember who. At the start of the game, you know that 1 of 2 players is a particular evil role."
+		}
     }
     public func roleName(_ role: Role) -> String {
         switch role {
@@ -219,6 +225,12 @@ public struct English: I18n {
 			return "Cursed"
 		case .oracle:
 			return "Oracle"
+		case .laundryperson:
+			return "Laundryperson"
+		case .gossip:
+			return "Gossip"
+		case .librarian:
+			return "Librarian"
         }
     }
 	public func teamName(_ team: Team) -> String {
@@ -373,6 +385,12 @@ public struct TokiPona: I18n {
 			return "sina jan pi kama ike! jan lukin li lukin e ni: sina jan pi pali ala. taso, soweli mun li moli la, sina kama soweli mun!"
 		case .oracle:
 			return "wawa sewi li pana e ken ni tawa sina: sina sona e pali ala jan. (pali toki li lon musi.)"
+		case .laundryperson:
+			return "sina telo e len la, sina oko e ni: ilo li lon poki len pi jan tu a! open musi la, sina sona e ni: jan wan tan kulupu tu li jo e ilo ni (e poki ona)."
+		case .gossip:
+			return "sina toki mute a! sina toki pona la, sina kama sona e ni: jan wan tan kulupu tuli li ike a!"
+		case .librarian:
+			return "sina pali lon tomo lipu. jan li alasa e lipu ike tan ona. sona pi nimi ona li weka tan lawa sina a... taso sina sona e jan pini tu a! wan tan tu ni li ike a!"
         }
     }
     public func roleName(_ role: Role) -> String {
@@ -403,6 +421,12 @@ public struct TokiPona: I18n {
 			return "jan pi kama ike"
 		case .oracle:
 			return "jan oko"
+		case .laundryperson:
+			return "jan pi telo len"
+		case .gossip:
+			return "jan toki"
+		case .librarian:
+			return "jan lipu"
         }
     }
 	public func teamName(_ team: Team) -> String {

@@ -807,7 +807,7 @@ public class State<Comm: Communication> {
 				_ = try await dm?.send(CommunicationEmbed(body: "<@\(who)> is a \(name)!", color: .bad))
 			case .oracleCheck(let who):
 				let truth = trueWho(target: who, for: action.key)
-				let possibleRoles = Set(party.filter{alive[$0]!}.map{roles[$0]!})
+				let possibleRoles = Set(party.filter{$0 != truth}.filter{alive[$0]!}.map{roles[$0]!})
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				if let role = possibleRoles.randomElement() {
 					let name = i18n.roleName(role)

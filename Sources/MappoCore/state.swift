@@ -1081,9 +1081,19 @@ public class State<Comm: Communication> {
 		"cookies-give": cookiesGive,
 		"nominate": nominate,
 		"goose": goose,
+		"oracle-investigate": oracleInvestigate,
 	]
 
 	// interaction implementations
+	func oracleInvestigate(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard roles[who] == .oracle else {
+			try await interaction.reply(with: "You aren't an oracle!", epheremal: true)
+			return
+		}
+		try await interaction.reply(with: "You're going to investigate <@\(target)> tonight!", epheremal: true)
+		actions[who] = .oracleCheck(who: target)
+	}
+
 	func werewolfKill(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard roles[who] == .werewolf else {
 			try await interaction.reply(with: "You aren't a werewolf", epheremal: true)

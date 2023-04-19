@@ -119,7 +119,7 @@ public enum Role: CaseIterable {
 	}
 
 	static let good: [Role] = [.guardianAngel, .seer, .oracle, .beholder, .pacifist]
-	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry, .innocent]
+	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry, .innocent, .librarian, .gossip, .laundryperson]
 	static let evil: [Role] = [.werewolf, .cursed, .goose]
 }
 

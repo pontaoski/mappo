@@ -9,12 +9,40 @@ public protocol I18n {
     func votingTitle(numNominations: Int) -> String
     func getOverHere(_ list: String) -> String
     func beholderSeer(who: String) -> String
+    func laundrypersonStart(_ p1: String, _ p2: String, _ role: Role) -> String
+    func gossip(_ p1: String, _ p2: String, _ p3: String) -> String
+    func librarianStart(_ p1: String, _ p2: String, _ role: Role) -> String
+    func gooseKillMessage(who: String) -> String
+    func werewolfKillMessage(who: String) -> String
 	func exilingTitle(who: String) -> String
 	func notExilingTitle(who: String) -> String
 	func votingPersonTitle(who: String) -> String
 	func nightStatus(who: String, role: Role, alive: Bool) -> String
 	func drVisitAlso(who: String) -> String
+	func visitedWerewolf(who: String) -> String
+	func visitedWerewolfEaten(who: String) -> String
+	func visitedWerewolfProtected(who: String) -> String
+	func visitedPersonBeingVisitedByWerewolf(who: String, visiting: String) -> String
+	func visitedPersonBeingVisitedByWerewolfEaten(who: String) -> String
+	func visitedPersonBeingVisitedByWerewolfProtected(who: String) -> String
+	func pacifistIntervention(who: String) -> String
+	func nominatedInnocent(who: String) -> String
+	func protectedWerewolf(who: String) -> String
+	func wasA(_ role: Role) -> String
+	func check(who: String, is role: Role) -> String
+	func check(who: String, isNot role: Role) -> String
+	func victory(_ reason: VictoryReason) -> String
 
+	var partyListTitle: String { get }
+	var playerStatusTitle: String { get }
+	var frozenByWerewolfDM: String { get }
+	var frozenByWerewolfAnnouncement: String { get }
+	var cursedIsWerewolfNow: String { get }
+	var gooseIsViolentNow: String { get }
+	var killSuccess: String { get }
+	var killFailure: String { get }
+	var killProtected: String { get }
+	var killAwayFromHome: String { get }
     var peopleJoinedParty: String { get }
     var peopleLeftParty: String { get }
     var nightHasFallen: String { get }
@@ -60,8 +88,53 @@ public protocol I18n {
 }
 
 public struct English: I18n {
+    public func laundrypersonStart(_ p1: String, _ p2: String, _ role: Role) -> String { "You know that one of <@\(p1)> or <@\(p2)> is a \(roleName(role))." }
+    public func gossip(_ p1: String, _ p2: String, _ p3: String) -> String { "You know that one of <@\(p1)>, <@\(p2)>, or <@\(p3)> is evil!" }
+    public func librarianStart(_ p1: String, _ p2: String, _ role: Role) -> String { "You know that one of <@\(p1)> or <@\(p2)> is a \(roleName(role))." }
+
+	static var gooseDeathItems: [String] {
+		[
+			"an old rusty knife",
+			"a pride flag",
+			"a loaf of bread",
+			"pure hatred",
+			"a garden hose"
+		]
+	}
+
+    public func gooseKillMessage(who: String) -> String { "The Geese try to stab <@\(who)> with \(English.gooseDeathItems.randomElement()!)..." }
+    public func werewolfKillMessage(who: String) -> String { "The Werewolves try to kill <@\(who)>..." }
+    public func visitedWerewolf(who: String) -> String { "<@\(who)> decided to visit a Werewolf, uh-oh..." }
+    public func visitedWerewolfEaten(who: String) -> String { "and <@\(who)> got eaten!" }
+    public func visitedWerewolfProtected(who: String) -> String { "Luckily, <@\(who)> was protected by a Guardian Angel!" }
+    public func visitedPersonBeingVisitedByWerewolf(who: String, visiting: String) -> String { "<@\(who)> was visiting <@\(visiting)>, but unfortunately, the werewolves were visiting them too!" }
+    public func visitedPersonBeingVisitedByWerewolfEaten(who: String) -> String { "The werewolves had a tasty bonus snack! <@\(who)> got eaten by the werewolves!" }
+    public func visitedPersonBeingVisitedByWerewolfProtected(who: String) -> String { "The werewolves were going to have a bonus snack, but <@\(who)> was protected by a Guardian Angel!" }
+    public func pacifistIntervention(who: String) -> String { "The pacifist snuck <@\(who)> away from the executioner's hands! They get to live another day." }
+    public func nominatedInnocent(who: String) -> String { "<@\(who)> drew the ire of the heavens by nominating their favourite Innocent, and collapses dead due to its intervention! Oops." }
+    public func protectedWerewolf(who: String) -> String { "<@\(who)> used angelic magic to protect a werewolf. Unfortunately, the werewolf's evil magic killed <@\(who)> when the two magics collided! Oops." }
+    public func wasA(_ role: Role) -> String { "was a \(role)" }
+    public func check(who: String, is role: Role) -> String { "<@\(who)> is a \(roleName(role))!" }
+    public func check(who: String, isNot role: Role) -> String { "<@\(who)> is not a \(roleName(role))!" }
+    public func victory(_ reason: VictoryReason) -> String {
+        switch reason {
+        case .allWerewolvesDead: return "All the werewolves are dead!"
+		case .werewolvesMajority: return "Ope, the werewolves outnumber the villagers!"
+		case .jesterExiled: return "The jester got exiled!"
+		}
+    }
+    public let partyListTitle = "Your Party"
+    public let playerStatusTitle = "Players"
+    public let frozenByWerewolfDM = "You were frozen by the Werewolf!"
+    public let frozenByWerewolfAnnouncement = "You felt the chills of the werewolf's ice magic freezing someone in the night..."
+    public let cursedIsWerewolfNow = "Looks like the werewolf died, so you're the werewolf now!"
+    public let gooseIsViolentNow = "Looks like there aren't any werewolves, time to take matters into your own hands! Now, people will die when you goose them."
+    public let killSuccess = "... and succeeded!"
+    public let killFailure = "... and failed."
+    public let killProtected = "... but a Guardian Angel protects them!"
+    public let killAwayFromHome = "... but they were away from home!"
     public let peopleJoinedParty = "Some people have joined the party!"
-    public let peopleLeftParty = "Some people have joined the party!"
+    public let peopleLeftParty = "Some people have left the party!"
     public let nightHasFallen = "Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!"
     public let villagersGather = "The villagers gather the next morning in the village center."
     public let itIsDaytime = "It is now day time. All of you have at least 30 seconds to make your accusations, defenses, claim roles, or just talk."
@@ -256,6 +329,51 @@ public struct English: I18n {
 }
 
 public struct TokiPona: I18n {
+    public func laundrypersonStart(_ p1: String, _ p2: String, _ role: Role) -> String { "sina sona e ni: wan lon kulupu pi <@\(p1)> en <@\(p2)> li \(roleName(role))." }
+    public func gossip(_ p1: String, _ p2: String, _ p3: String) -> String { "sina sona e ni: wan lon kulupu pi <@\(p1)> en <@\(p2)> en <@\(p3)> li ike!" }
+    public func librarianStart(_ p1: String, _ p2: String, _ role: Role) -> String { "sina sona e ni: wan lon kulupu pi <@\(p1)> en <@\(p2)> li \(roleName(role))." }
+
+	static var gooseDeathItems: [String] {
+		[
+			"ilo kipisi jaki",
+			"len kule",
+			"pan",
+			"pilin ike",
+			"linja telo"
+		]
+	}
+
+    public func gooseKillMessage(who: String) -> String { "waso li alasa moli e <@\(who)> kepeken \(English.gooseDeathItems.randomElement()!)..." }
+    public func werewolfKillMessage(who: String) -> String { "soweli mun li alasa moli e <@\(who)>..." }
+    public func visitedWerewolf(who: String) -> String { "<@\(who)> li tawa tomo pi soweli mun, pakala..." }
+    public func visitedWerewolfEaten(who: String) -> String { "<@\(who)> li kama moku!" }
+    public func visitedWerewolfProtected(who: String) -> String { "pona a! jan awen sewi li awen e <@\(who)>!" }
+    public func visitedPersonBeingVisitedByWerewolf(who: String, visiting: String) -> String { "<@\(who)> li tawa tomo pi <@\(visiting)>. ike la, soweli mun li tawa tomo sama!" }
+    public func visitedPersonBeingVisitedByWerewolfEaten(who: String) -> String { "soweli mun li jo e moku kin! <@\(who)> li kama moku a!" }
+    public func visitedPersonBeingVisitedByWerewolfProtected(who: String) -> String { "tenpo ante la soweli mun li jo e moku kin. taso tenpo ni la jan awen sewi li awen e <@\(who)>!" }
+    public func pacifistIntervention(who: String) -> String { "jan pi utala ala li weka e <@\(who)> tan tomo moli! ona li moli ala!" }
+    public func nominatedInnocent(who: String) -> String { "<@\(who)> li wile weka e jan pi ike ala! ni li ike suli tawa kulupu sewi! ona li kama moli tan ni. pakala." }
+    public func protectedWerewolf(who: String) -> String { "<@\(who)> li awen e soweli mun. taso wawa ike pi soweli mun li moli e ona! pakala." }
+    public func wasA(_ role: Role) -> String { "li \(role)" }
+    public func check(who: String, is role: Role) -> String { "<@\(who)> li \(roleName(role))!" }
+    public func check(who: String, isNot role: Role) -> String { "<@\(who)> li \(roleName(role)) ala!" }
+    public func victory(_ reason: VictoryReason) -> String {
+        switch reason {
+        case .allWerewolvesDead: return "kulupu ike li moli!"
+		case .werewolvesMajority: return "kulupu ike li suli la kulupu pona li lili a!"
+		case .jesterExiled: return "jan nasa li kama weka!"
+		}
+    }
+    public let partyListTitle = "kulupu musi"
+    public let playerStatusTitle = "kulupu musi"
+    public let frozenByWerewolfDM = "sina kama lete pi pali ala tan soweli mun!"
+    public let frozenByWerewolfAnnouncement = "sina pilin e wawa lete pi soweli mun lon tenpo pimeja. sina sona e ni: soweli mun li lete e ijo."
+    public let cursedIsWerewolfNow = "soweli mun li moli a la sina kama soweli mun sin!"
+    public let gooseIsViolentNow = "soweli mun li moli a la sina o utala a! sina waso e ijo la ona li kama moli."
+    public let killSuccess = "... ona li moli e ona!"
+    public let killFailure = "... ona li moli ala e ona."
+    public let killProtected = "... jan awen sewi li awen e ona!"
+    public let killAwayFromHome = "... taso ona li weka tan tomo ona!"
     public let peopleJoinedParty = "jan li kama tawa kulupu!"
     public let peopleLeftParty = "jan li weka tan kulupu!"
     public let nightHasFallen = "tenpo pimeja li kama. jan ale li tawa supa lape li pilin pi wawa ala. jan musi pi tenpo pimeja o, pali lon tenpo pimeja ni a!"

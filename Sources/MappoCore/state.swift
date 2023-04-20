@@ -145,7 +145,7 @@ enum DeathReason<T: Communication>: Equatable {
 	case goose
 }
 
-enum VictoryReason {
+public enum VictoryReason {
 	case allWerewolvesDead
 	case werewolvesMajority
 	case jesterExiled
@@ -571,16 +571,16 @@ public class State<Comm: Communication> {
 			case .laundryperson:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .good || roles[$0]!.disposition == .neutral }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
-				_ = try await dm?.send(CommunicationEmbed(body: "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart("\(player1)", "\(player2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
 			case .gossip:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let player3 = party.filter{$0 != user && $0 != player1 && $0 != player2}.randomElement()!
-				_ = try await dm?.send(CommunicationEmbed(body: "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip("\(player2)", "\(player2)", "\(player3)"))) // "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"
 			case .librarian:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
-				_ = try await dm?.send(CommunicationEmbed(body: "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart("\(player1)", "\(player2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
 			default:
 				break
 			}
@@ -687,77 +687,67 @@ public class State<Comm: Communication> {
 		alive[who] = false
 	}
 
-	static var gooseDeathItems: [String] {
-		[
-			"an old rusty knife",
-			"a pride flag",
-			"a loaf of bread",
-			"pure hatred",
-			"a garden hose"
-		]
-	}
-
 	func attemptKill(_ who: Comm.UserID, because why: DeathReason<Comm>) async throws {
 		switch why {
 		case .werewolf, .goose:
 			if why == .goose {
-				_ = try await thread?.send(CommunicationEmbed(body: "The Geese try to stab <@\(who)> with \(State.gooseDeathItems.randomElement()!)..."))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.gooseKillMessage(who: "\(who)"))) // "The Geese try to stab <@\(who)> with \(State.gooseDeathItems.randomElement()!)..."
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: "The Werewolves try to kill <@\(who)>..."))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.werewolfKillMessage(who: "\(who)"))) // "The Werewolves try to kill <@\(who)>..."
 			}
 
 			try await Task.sleep(nanoseconds: 3_000_000_000)
 
 			if actions.contains(where: { $0.key == who && $0.value == .kill(who: who)}) {
 				if Double.random(in: 0...1) < (werewolfKillSuccessRate * 0.2) {
-					_ = try await thread?.send(CommunicationEmbed(body: "... and succeed!", color: .bad))
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.killSuccess, color: .bad))
 					try await kill(who, because: why)
 				} else {
-					_ = try await thread?.send(CommunicationEmbed(body: "... and fail!", color: .good))
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.killFailure, color: .good))
 				}
 			} else if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: "... but a Guardian Angel protects them!", color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.killProtected, color: .good))
 			} else if actions.contains(where: { $0.key == who && $0.value.awayFromHome && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: "... but they were away from home!", color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.killAwayFromHome, color: .good))
 			} else if Double.random(in: 0...1) < werewolfKillSuccessRate {
-				_ = try await thread?.send(CommunicationEmbed(body: "... and succeed!", color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.killSuccess, color: .bad))
 				try await kill(who, because: why)
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: "... and fail!", color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.killFailure, color: .good))
 			}
 		case .visitedWerewolf:
-			_ = try await thread?.send(CommunicationEmbed(body: "<@\(who)> decided to visit a Werewolf, uh-oh...", color: .bad))
+			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolf(who: "\(who)"), color: .bad))
 			try await Task.sleep(nanoseconds: 3_000_000_000)
 
 			if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: "Luckily, <@\(who)> was protected by a Guardian Angel!", color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfProtected(who: "\(who)"), color: .good))
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: "and <@\(who)> got eaten!", color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfEaten(who: "\(who)"), color: .bad))
 
 				try await kill(who, because: .visitedWerewolf)
 			}
 		case .visitedSomeoneBeingVisitedByWerewolf(let visiting):
-			_ = try await thread?.send(CommunicationEmbed(body: "<@\(who)> was visiting <@\(visiting)>, but unfortunately, the werewolves were visiting them too!", color: .bad))
+			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolf(who: "\(who)", visiting: "\(visiting)"), color: .bad))
 			try await Task.sleep(nanoseconds: 3_000_000_000)
 			if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: "The werewolves were going to have a bonus snack, but <@\(who)> was protected by a Guardian Angel!", color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfProtected(who: "\(who)"), color: .good))
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: "The werewolves had a tasty bonus snack! <@\(who)> got eaten by the werewolves!", color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfEaten(who: "\(who)"), color: .bad))
 				try await kill(who, because: why)
 			}
 			break
 		case .exile:
 			if roles[who]?.disposition != .evil && roles.filter({ alive[$0.key]! }).contains(where: { $0.value == .pacifist}) && Double.random(in: 0...1) > 0.5 {
-				_ = try await thread?.send(CommunicationEmbed(body: "The pacifist intervenes! <@\(who)> isn't going to be executed tonight!", color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.pacifistIntervention(who: "\(who)"), color: .good))
 			} else {
 				try await kill(who, because: why)
 			}
 		case .nominatedInnocent:
-			_ = try await thread?.send(CommunicationEmbed(body: "<@\(who)> collapses dead due to mysterious heavenly intervention! Oops.", color: .bad))
+			_ = try await thread?.send(CommunicationEmbed(body: i18n.nominatedInnocent(who: "\(who)"), color: .bad))
 			try await kill(who, because: why)
 		case .protectedWerewolf:
 			if Double.random(in: 0...1) > 0.5 {
-				_ = try await thread?.send(CommunicationEmbed(body: "<@\(who)> used angelic magic to protect a werewolf. Unfortunately, the werewolf's evil magic killed <@\(who)> when the two magics collided! Oops.", color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.protectedWerewolf(who: "\(who)"), color: .bad))
 
 				try await kill(who, because: .protectedWerewolf)
 			}
@@ -767,14 +757,14 @@ public class State<Comm: Communication> {
 			for cursed in curseds.keys {
 				roles[cursed] = .werewolf
 				let dm = try await comm.getChannel(for: cursed, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: "Looks like the werewolf died, so you're the werewolf now!", color: .good))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.cursedIsWerewolfNow, color: .good))
 			}
 		}
 		if !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }) {
 			let geese = roles.filter({ $0.value == .goose })
 			for goose in geese.keys {
 				let dm = try await comm.getChannel(for: goose, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: "Looks like there aren't any werewolves, time to take matters into your own hands! Now, people will die when you goose them.", color: .good))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.gooseIsViolentNow, color: .good))
 			}
 		}
 		try await handlePossibleWin(whoDied: who, why: why)
@@ -795,23 +785,22 @@ public class State<Comm: Communication> {
 		for action in actions {
 			if actions.values.contains(.freeze(who: action.key)) {
 				let dm = try await comm.getChannel(for: action.key, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: "A werewolf froze you, therefore you couldn't do anything tonight!", color: .bad))
-				_ = try await thread?.send(CommunicationEmbed(body: "A werewolf froze someone tonight!", color: .bad))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.frozenByWerewolfDM, color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.frozenByWerewolfAnnouncement, color: .bad))
 				continue
 			}
 			switch action.value {
 			case .check(let who):
 				let truth = trueWho(target: who, for: action.key)
-				let name = i18n.roleName(roles[truth]!.appearsAs(to: .seer))
+				let role = roles[truth]!.appearsAs(to: .seer)
 				let dm = try await comm.getChannel(for: action.key, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: "<@\(who)> is a \(name)!", color: .bad))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: "\(who)", is: role), color: .bad))
 			case .oracleCheck(let who):
 				let truth = trueWho(target: who, for: action.key)
 				let possibleRoles = Set(party.filter{$0 != truth}.filter{alive[$0]!}.map{roles[$0]!})
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				if let role = possibleRoles.randomElement() {
-					let name = i18n.roleName(role)
-					_ = try await dm?.send(CommunicationEmbed(body: "<@\(who)> is not a \(name)!", color: .bad))
+					_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: "\(who)", isNot: role), color: .bad))
 				} else {
 					_ = try await dm?.send(CommunicationEmbed(body: "<@\(who)> is not a something...? I shouldn't be able to reach this game state", color: .bad))
 				}
@@ -865,14 +854,7 @@ public class State<Comm: Communication> {
 			return
 		}
 
-		switch reason {
-		case .allWerewolvesDead:
-			_ = try await thread?.send("All the werewolves are dead!")
-		case .jesterExiled:
-			_ = try await thread?.send("The jester got exiled!")
-		case .werewolvesMajority:
-			_ = try await thread?.send("Oops, looks like there's more werewolves than villagers now!")
-		}
+		_ = try await thread?.send(i18n.victory(reason))
 
 		state = .waiting
 		let txt = party
@@ -880,10 +862,10 @@ public class State<Comm: Communication> {
 				let role = roles[item]!
 				let alive = alive[item]! ? ":slight_smile:" : ":skull:"
 				let won = teams[item] == reason.winningTeam ? ":trophy:" : ":x:"
-				return "\(won)\(alive) <@\(item)> (was a \(i18n.roleName(role)))"
+				return "\(won)\(alive) <@\(item)> (\(i18n.wasA(role)))"
 			}
 			.joined(separator: "\n")
-		_ = try await thread?.send(CommunicationEmbed(title: "Players", body: txt))
+		_ = try await thread?.send(CommunicationEmbed(title: i18n.playerStatusTitle, body: txt))
 
 		throw GameEnded()
 	}
@@ -975,7 +957,7 @@ public class State<Comm: Communication> {
 	}
 	func party(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		_ = try await interaction.reply(
-			with: CommunicationEmbed(title: "Your Party", body: party.map { "<@\($0)>" }.joined(separator: "\n")),
+			with: CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "<@\($0)>" }.joined(separator: "\n")),
 			epheremal: false
 		)
 	}

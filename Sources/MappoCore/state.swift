@@ -196,7 +196,9 @@ public enum TimeOfYear {
 	}
 }
 
-struct GameEnded: Error {}
+enum GameConditions: Error {
+	case gameEnded(reason: VictoryReason)
+}
 
 public struct CommunicationEmbed {
 	public enum Kind {
@@ -460,10 +462,20 @@ public class State<Comm: Communication> {
 		}
 	}
 
-	func endGameCleanup() async throws {
+	func endGameCleanup(reason: VictoryReason) async throws {
 		if let thread = thread {
 			_ = try await comm.archive(thread, state: self)
 		}
+
+		let txt = party
+			.map { item -> String in
+				let role = roles[item]!
+				let alive = alive[item]! ? ":slight_smile:" : ":skull:"
+				let won = teams[item] == reason.winningTeam ? ":trophy:" : ":x:"
+				return "\(won)\(alive) <@\(item)> (\(i18n.wasA(role)))"
+			}
+			.joined(separator: "\n")
+		_ = try await channel.send(CommunicationEmbed(title: i18n.victoryTitle(reason), body: txt))
 
 		let incoming = joinQueue.map { "<@\($0)>" }.joined(separator: "\n")
 		let outgoing = leaveQueue.map { "<@\($0)>" }.joined(separator: "\n")
@@ -552,6 +564,17 @@ public class State<Comm: Communication> {
 		try await Task.sleep(nanoseconds: 25_000_000_000)
 	}
 
+	func randomize<T>(_ one: T, _ two: T) -> (T, T) {
+		var parts = [one, two]
+		parts.shuffle()
+		return (parts[0], parts[1])
+	}
+	func randomize<T>(_ one: T, _ two: T, _ three: T) -> (T, T, T) {
+		var parts = [one, two, three]
+		parts.shuffle()
+		return (parts[0], parts[1], parts[2])
+	}
+
 	func startPlaying() async throws {
 		state = .playing
 
@@ -573,16 +596,19 @@ public class State<Comm: Communication> {
 			case .laundryperson:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .good || roles[$0]!.disposition == .neutral }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart("\(player1)", "\(player2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
+				let (p1, p2) = randomize(player1, player2)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart("\(p1)", "\(p2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
 			case .gossip:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let player3 = party.filter{$0 != user && $0 != player1 && $0 != player2}.randomElement()!
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip("\(player2)", "\(player2)", "\(player3)"))) // "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"
+				let (p1, p2, p3) = randomize(player1, player2, player3)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip("\(p1)", "\(p2)", "\(p3)"))) // "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"
 			case .librarian:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart("\(player1)", "\(player2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
+				let (p1, p2) = randomize(player1, player2)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart("\(p1)", "\(p2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
 			default:
 				break
 			}
@@ -591,8 +617,8 @@ public class State<Comm: Communication> {
 		while state == .playing {
 			do {
 				try await playNight()
-			} catch is GameEnded {
-				try await endGameCleanup()
+			} catch GameConditions.gameEnded(let reason) {
+				try await endGameCleanup(reason: reason)
 			}
 		}
 	}
@@ -869,7 +895,7 @@ public class State<Comm: Communication> {
 			.joined(separator: "\n")
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.playerStatusTitle, body: txt))
 
-		throw GameEnded()
+		throw GameConditions.gameEnded(reason: reason)
 	}
 
 	public let arglessCommands = [

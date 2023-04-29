@@ -169,6 +169,12 @@ final class DiscordCommunication: Communication {
 	func archive(_ id: Channel, state: DiscordState) async throws {
 		// _ = try await bot.modifyChannel(id.channel.id, with: ["archived": true, "locked": true])
 	}
+	func currentParty(of user: UserID, state: DiscordState) async throws -> DiscordState? {
+		return gs.states[user]
+	}
+	func onPrepareJoined(_ user: UserID, state: DiscordState) async throws {
+		gs.states[user] = state
+	}
 	func onJoined(_ user: UserID, state: DiscordState) async throws {
 		gs.states[user] = state
 	}

@@ -79,6 +79,7 @@ public protocol I18n {
 	var leaveLeaveQueue: String { get }
 	var addedJoinQueue: String { get }
 	var alreadyInParty: String { get }
+	var alreadyInAnotherParty: String { get }
 	var joinedParty: String { get }
 	var setupRequired: String { get }
 	var leaveJoinQueue: String { get }
@@ -169,6 +170,7 @@ public struct English: I18n {
 	public let leaveLeaveQueue = "You have left the leave queue! You will stay in the game"
 	public let addedJoinQueue = "You have been added to the join queue! You will join when the current game is over"
 	public let alreadyInParty = "You're already in the party!"
+	public let alreadyInAnotherParty = "You're in another party!"
 	public let joinedParty = "You have joined the party!"
 	public let setupRequired = "You need to setup again, since a new player joined"
 	public let leaveJoinQueue = "You have left the leave queue"
@@ -410,6 +412,7 @@ public struct TokiPona: I18n {
 	public let leaveLeaveQueue = "sina kama weka tan tomo weka! sina awen lon musi."
 	public let addedJoinQueue = "sina kama lon tomo kama! musi ni li pini la, sina kama lon musi."
 	public let alreadyInParty = "sina awen lon tomo musi!"
+	public let alreadyInAnotherParty = "sina lon tomo musi ante!"
 	public let joinedParty = "sina kama lon tomo musi!"
 	public let setupRequired = "jan sin li kama la, sina o sin e pali jan."
 	public let leaveJoinQueue = "sina kama weka tan tomo kama! sina kama ala musi."

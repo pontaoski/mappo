@@ -122,6 +122,14 @@ final class MatrixCommunication: Communication {
 		// nothing
 	}
 
+	func currentParty(of user: String, state: State<MatrixCommunication>) async throws -> State<MatrixCommunication>? {
+		return users[user]
+	}
+
+	func onPrepareJoined(_ user: String, state: State<MatrixCommunication>) async throws {
+		users[user] = state
+	}
+
 	func onJoined(_ user: UserID, state: State<MatrixCommunication>) async throws {
 		users[user] = state
 	}

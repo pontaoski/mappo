@@ -282,6 +282,8 @@ public protocol Communication {
 	func getChannel(for: UserID, state: State<Self>) async throws -> Channel?
 	func createGameThread(state: State<Self>) async throws -> Channel?
 	func archive(_: Channel, state: State<Self>) async throws
+	func currentParty(of user: UserID, state: State<Self>) async throws -> State<Self>?
+	func onPrepareJoined(_ user: UserID, state: State<Self>) async throws
 	func onJoined(_: UserID, state: State<Self>) async throws
 	func onLeft(_: UserID, state: State<Self>) async throws
 }
@@ -894,7 +896,17 @@ public class State<Comm: Communication> {
 			if leaveQueue.contains(who) {
 				_ = try await interaction.reply(with: i18n.leaveLeaveQueue, epheremal: true)
 			} else {
+				guard !party.contains(who) else {
+					_ = try await interaction.reply(with: i18n.alreadyInParty, epheremal: true)
+					return
+				}
+				guard try await comm.currentParty(of: who, state: self) == nil else {
+					_ = try await interaction.reply(with: i18n.alreadyInAnotherParty, epheremal: true)
+					return
+				}
+
 				joinQueue.insert(who)
+				try await comm.onPrepareJoined(who, state: self)
 				_ = try await interaction.reply(with: i18n.addedJoinQueue, epheremal: true)
 			}
 			return
@@ -903,6 +915,11 @@ public class State<Comm: Communication> {
 			_ = try await interaction.reply(with: i18n.alreadyInParty, epheremal: true)
 			return
 		}
+		guard try await comm.currentParty(of: who, state: self) == nil else {
+			_ = try await interaction.reply(with: i18n.alreadyInAnotherParty, epheremal: true)
+			return
+		}
+		try await comm.onPrepareJoined(who, state: self)
 		try await comm.onJoined(who, state: self)
 		party.append(who)
 		_ = try await interaction.reply(with: i18n.joinedParty, epheremal: false)

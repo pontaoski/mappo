@@ -114,7 +114,7 @@ public struct English: I18n {
     public func pacifistIntervention(who: String) -> String { "The pacifist snuck <@\(who)> away from the executioner's hands! They get to live another day." }
     public func nominatedInnocent(who: String) -> String { "<@\(who)> drew the ire of the heavens by nominating their favourite Innocent, and collapses dead due to its intervention! Oops." }
     public func protectedWerewolf(who: String) -> String { "<@\(who)> used angelic magic to protect a werewolf. Unfortunately, the werewolf's evil magic killed <@\(who)> when the two magics collided! Oops." }
-    public func wasA(_ role: Role) -> String { "was a \(role)" }
+    public func wasA(_ role: Role) -> String { "was a \(roleName(role))" }
     public func check(who: String, is role: Role) -> String { "<@\(who)> is a \(roleName(role))!" }
     public func check(who: String, isNot role: Role) -> String { "<@\(who)> is not a \(roleName(role))!" }
     public func victory(_ reason: VictoryReason) -> String {
@@ -356,7 +356,7 @@ public struct TokiPona: I18n {
     public func pacifistIntervention(who: String) -> String { "jan pi utala ala li weka e <@\(who)> tan tomo moli! ona li moli ala!" }
     public func nominatedInnocent(who: String) -> String { "<@\(who)> li wile weka e jan pi ike ala! ni li ike suli tawa kulupu sewi! ona li kama moli tan ni. pakala." }
     public func protectedWerewolf(who: String) -> String { "<@\(who)> li awen e soweli mun. taso wawa ike pi soweli mun li moli e ona! pakala." }
-    public func wasA(_ role: Role) -> String { "li \(role)" }
+    public func wasA(_ role: Role) -> String { "li \(roleName(role))" }
     public func check(who: String, is role: Role) -> String { "<@\(who)> li \(roleName(role))!" }
     public func check(who: String, isNot role: Role) -> String { "<@\(who)> li \(roleName(role)) ala!" }
     public func victory(_ reason: VictoryReason) -> String {

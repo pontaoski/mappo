@@ -33,6 +33,8 @@ public protocol I18n {
     func check(who: String, isNot role: Role) -> String
     func victory(_ reason: VictoryReason) -> String
     func victoryTitle(_ reason: VictoryReason) -> String
+    func necromancerRevivedAndDidntConvert(who: String) -> String
+    func necromancerRevivedAndConverted(who: String) -> String
 
     var partyListTitle: String { get }
     var playerStatusTitle: String { get }
@@ -71,6 +73,9 @@ public protocol I18n {
     var oraclePrompt: String { get }
     var cpPrompt: String { get }
     var goosePrompt: String { get } 
+    var necromancerPrompt: String { get }
+    var revivedNoChange: String { get }
+    var revivedVampire: String { get }
     var drWerewolf: String { get }
     var drExile: String { get }
     var drVisit: String { get }
@@ -118,6 +123,8 @@ public struct English: I18n {
     public func wasA(_ role: Role) -> String { "was a \(roleName(role))" }
     public func check(who: String, is role: Role) -> String { "<@\(who)> is a \(roleName(role))!" }
     public func check(who: String, isNot role: Role) -> String { "<@\(who)> is not a \(roleName(role))!" }
+    public func necromancerRevivedAndDidntConvert(who: String) -> String { "<@\(who)> got revived, but didn't become a vampire! "}
+    public func necromancerRevivedAndConverted(who: String) -> String { "<@\(who)> got revived, and became a vampire! "}
     public func victory(_ reason: VictoryReason) -> String {
         switch reason {
         case .allWerewolvesDead: return "All the werewolves are dead!"
@@ -130,6 +137,7 @@ public struct English: I18n {
         case .village: return "The villagers won!"
         case .werewolf: return "The werewolves won!"
         case .jester: return "The jester won!"
+        case .necromancer: return "The necromancer won!"
         }
     }
     public let partyListTitle = "Your Party"
@@ -169,6 +177,9 @@ public struct English: I18n {
     public let oraclePrompt = "Choose someone to see what role they are not (from roles that are in the game)"
     public let cpPrompt = "Choose someone to visit during the night and give them cookies"
     public let goosePrompt = "Choose someone to goose tonight!"
+    public let necromancerPrompt = "Choose someone to revive tonight! (They have a 50% chance to become a vampire...)"
+    public let revivedVampire = "You were revived, but you became a vampire!"
+    public let revivedNoChange = "You were revived!"
     public let drWerewolf = "You were killed by a werewolf!"
     public let drExile = "You were exiled by the village!"
     public let drVisit = "You died because you visited a werewolf!"
@@ -278,6 +289,10 @@ public struct English: I18n {
             return "You love to gossip! With your social savvy, you realise that one of three people in your favourite gossip circle is evil!"
         case .librarian:
             return "You're the sole person in the town's library. One of your recent patrons checked out an evil book, but you can't remember who. At the start of the game, you know that 1 of 2 players is a particular evil role."
+        case .necromancer:
+            return "You can bring people back from the dead, with a 50% chance to turn them into vampires. You win when you and your vampires outnumber everyone else."
+        case .vampire:
+            return "You were brought back from the dead to a new form by the Necromancer! Try not to return to the grave!"
         }
     }
     public func roleName(_ role: Role) -> String {
@@ -314,6 +329,10 @@ public struct English: I18n {
             return "Gossip"
         case .librarian:
             return "Librarian"
+        case .necromancer:
+            return "Necromancer"
+        case .vampire:
+            return "Vampire"
         }
     }
     public func teamName(_ team: Team) -> String {
@@ -324,6 +343,8 @@ public struct English: I18n {
             return "Village"
         case .werewolf:
             return "Werewolf"
+        case .necromancer:
+            return "Necromancer"
         }
     }
     public func dispositionName(_ disposition: Disposition) -> String {
@@ -367,6 +388,8 @@ public struct TokiPona: I18n {
     public func wasA(_ role: Role) -> String { "li \(roleName(role))" }
     public func check(who: String, is role: Role) -> String { "<@\(who)> li \(roleName(role))!" }
     public func check(who: String, isNot role: Role) -> String { "<@\(who)> li \(roleName(role)) ala!" }
+    public func necromancerRevivedAndDidntConvert(who: String) -> String { "<@\(who)> li kama lon sin a li kama ala moli mun! "}
+    public func necromancerRevivedAndConverted(who: String) -> String { "<@\(who)> li kama lon sin a li kama moli mun! "}
     public func victory(_ reason: VictoryReason) -> String {
         switch reason {
         case .allWerewolvesDead: return "kulupu ike li moli!"
@@ -379,6 +402,7 @@ public struct TokiPona: I18n {
         case .village: return "kulupu pi ma tomo li awen!"
         case .werewolf: return "soweli mun li moli e ma tomo!"
         case .jester: return "jan nasa li weka!"
+        case .necromancer: return "kulupu pi jan pi wawa moli li kama suli!"
         }
     }
     public let partyListTitle = "kulupu musi"
@@ -418,6 +442,9 @@ public struct TokiPona: I18n {
     public let oraclePrompt = "sina wile sona e pali ala pi jan seme?"
     public let cpPrompt = "sina wile pana e pan tawa jan seme?"
     public let goosePrompt = "sina wile waso e jan seme?"
+    public let necromancerPrompt = "sina wile pana e lon sin tawa jan seme? (ken 50% la ona li kama moli mun...)"
+    public let revivedVampire = "sina kama lon sin a! taso sina kama moli mun a!"
+    public let revivedNoChange = "sina kama lon sin a!"
     public let drWerewolf = "soweli mun li moli e sina!"
     public let drExile = "jan li weka e sina!"
     public let drVisit = "sina tawa tomo pi soweli mun la, soweli mun li moli e sina!"
@@ -527,6 +554,10 @@ public struct TokiPona: I18n {
             return "sina toki mute a! sina toki pona la, sina kama sona e ni: jan wan tan kulupu tuli li ike a!"
         case .librarian:
             return "sina pali lon tomo lipu. jan li alasa e lipu ike tan ona. sona pi nimi ona li weka tan lawa sina a... taso sina sona e jan pini tu a! wan tan tu ni li ike a!"
+        case .necromancer:
+            return "sina ken pana e lon sin tawa jan moli. ken 50% la ona li kama moli mun."
+        case .vampire:
+            return "jan pi wawa moli li pana e lon sin tawa sina a! o kama ala moli sin!"
         }
     }
     public func roleName(_ role: Role) -> String {
@@ -563,6 +594,10 @@ public struct TokiPona: I18n {
             return "jan toki"
         case .librarian:
             return "jan lipu"
+        case .necromancer:
+            return "jan pi wawa moli"
+        case .vampire:
+            return "moli mun"
         }
     }
     public func teamName(_ team: Team) -> String {
@@ -573,6 +608,8 @@ public struct TokiPona: I18n {
             return "ma tomo"
         case .werewolf:
             return "soweli mun"
+        case .necromancer:
+            return "kulupu jan pi wawa moli"
         }
     }
     public func dispositionName(_ disposition: Disposition) -> String {

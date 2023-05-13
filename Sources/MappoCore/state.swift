@@ -46,6 +46,8 @@ public enum Role: CaseIterable {
 	case laundryperson
 	case gossip
 	case librarian
+	case necromancer
+	case vampire
 
 	func appearsAs(to: Role) -> Role {
 		switch (self, to) {
@@ -63,6 +65,9 @@ public enum Role: CaseIterable {
 			return false
 		}
 		guard count >= self.minimumPlayerCount else {
+			return false
+		}
+		if self == .vampire {
 			return false
 		}
 		if self == .beholder {
@@ -84,6 +89,8 @@ public enum Role: CaseIterable {
 				return .jester
 			case .werewolf, .goose, .cursed:
 				return .werewolf
+			case .necromancer, .vampire:
+				return .necromancer
 			default:
 				return .village
 		}
@@ -101,6 +108,8 @@ public enum Role: CaseIterable {
 	}
 	var minimumPlayerCount: Int {
 		switch self {
+		case .necromancer:
+			return 6
 		case .beholder, .cookiePerson, .jester, .seer:
 			return 5
 		default:
@@ -113,20 +122,21 @@ public enum Role: CaseIterable {
 			return .good
 		case .villager, .jester, .cookiePerson, .furry, .innocent, .laundryperson, .gossip, .librarian:
 			return .neutral
-		case .werewolf, .cursed, .goose:
+		case .werewolf, .cursed, .goose, .necromancer, .vampire:
 			return .evil
 		}
 	}
 
 	static let good: [Role] = [.guardianAngel, .seer, .oracle, .beholder, .pacifist]
 	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry, .innocent, .librarian, .gossip, .laundryperson]
-	static let evil: [Role] = [.werewolf, .cursed, .goose]
+	static let evil: [Role] = [.werewolf, .cursed, .goose, .necromancer, .vampire]
 }
 
 public enum Team: Equatable {
 	case village
 	case werewolf
 	case jester
+	case necromancer
 }
 
 public enum GameState {
@@ -299,6 +309,7 @@ public class State<Comm: Communication> {
 		case oracleCheck(who: Comm.UserID)
 		case giveCookies(to: Comm.UserID)
 		case goose(who: Comm.UserID)
+		case necromancerRevive(who: Comm.UserID)
 
 		func isValid<T: Sequence>(doer: Comm.UserID, with actions: T) -> Bool where T.Element == Action {
 			if actions.contains(.freeze(who: doer)) {
@@ -314,7 +325,7 @@ public class State<Comm: Communication> {
 			switch self {
 			case .kill, .giveCookies:
 				return true
-			case .freeze, .protect, .check, .goose, .oracleCheck:
+			case .freeze, .protect, .check, .goose, .oracleCheck, .necromancerRevive:
 				return false
 			}
 		}
@@ -641,8 +652,13 @@ public class State<Comm: Communication> {
 				continue
 			}
 			switch roles[user]! {
-			case .villager, .jester, .beholder, .furry, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian:
+			case .villager, .jester, .beholder, .furry, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian, .vampire:
 				break
+			case .necromancer:
+				let possible = party.filter { !alive[$0]! }
+				if possible.count != 0 {
+					actionMessages[user] = try await dm.send(userSelection: possible, id: "necromancer-revive", label: i18n.necromancerPrompt)
+				}
 			case .werewolf:
 				let menu: Set<Comm.UserID>
 				if self.timeOfYear == .earlyWinter || self.timeOfYear == .lateWinter {
@@ -846,6 +862,21 @@ public class State<Comm: Communication> {
 				let truth = trueWho(target: who, for: action.key)
 				if roles[truth] == .werewolf {
 					try await attemptKill(action.key, because: .protectedWerewolf)
+				}
+			case .necromancerRevive(let who):
+				let truth = trueWho(target: who, for: action.key)
+
+				let selfDM = try await comm.getChannel(for: action.key, state: self)
+				let targetDM = try await comm.getChannel(for: truth, state: self)
+
+				alive[truth] = true
+				if Double.random(in: 0...1) < 0.5 {
+					roles[truth] = .vampire
+					_ = try await selfDM?.send(CommunicationEmbed(body: i18n.necromancerRevivedAndConverted(who: "\(truth)"), color: .good))
+					_ = try await targetDM?.send(CommunicationEmbed(body: i18n.revivedVampire, color: .info))
+				} else {
+					_ = try await selfDM?.send(CommunicationEmbed(body: i18n.necromancerRevivedAndDidntConvert(who: "\(truth)"), color: .bad))
+					_ = try await targetDM?.send(CommunicationEmbed(body: i18n.revivedNoChange, color: .info))
 				}
 			case .goose(let who) where !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }):
 				let truth = trueWho(target: who, for: action.key)
@@ -1102,6 +1133,7 @@ public class State<Comm: Communication> {
 	public let userDropdowns = [
 		"werewolf-kill": werewolfKill,
 		"guardianAngel-protect": guardianAngelProtect,
+		"necromancer-revive": necromancerRevive,
 		"seer-investigate": seerInvestigate,
 		"cookies-give": cookiesGive,
 		"nominate": nominate,
@@ -1117,6 +1149,15 @@ public class State<Comm: Communication> {
 		}
 		try await interaction.reply(with: "You're going to investigate <@\(target)> tonight!", epheremal: true)
 		actions[who] = .oracleCheck(who: target)
+	}
+
+	func necromancerRevive(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard roles[who] == .necromancer else {
+			try await interaction.reply(with: "You aren't a necromancer!", epheremal: true)
+			return
+		}
+		try await interaction.reply(with: "You're going to revive <@\(target)> tonight!", epheremal: true)
+		actions[who] = .necromancerRevive(who: target)
 	}
 
 	func werewolfKill(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {

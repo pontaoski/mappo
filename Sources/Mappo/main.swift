@@ -36,17 +36,28 @@ class DiscordMessage: Deletable {
     }
 }
 
+struct GuildKey: Hashable {
+	let guild: Snowflake
+	let subkey: Snowflake
+}
+
+class CustomCache {
+	var members: [GuildKey: Guild.Member] = [:]
+}
+
 class DiscordChannel: Sendable, I18nable {
 	typealias Message = DiscordMessage
 	typealias UserID = Snowflake
 	let client: any DiscordClient
 	let cache: DiscordCache
+	let ccache: CustomCache
 	let guildID: Snowflake
 	let channelID: Snowflake
 
-	init(client: any DiscordClient, cache: DiscordCache, guildID: Snowflake, channelID: Snowflake) {
+	init(client: any DiscordClient, cache: DiscordCache, ccache: CustomCache, guildID: Snowflake, channelID: Snowflake) {
 		self.client = client
 		self.cache = cache
+		self.ccache = ccache
 		self.guildID = guildID
 		self.channelID = channelID
 	}
@@ -93,16 +104,24 @@ class DiscordChannel: Sendable, I18nable {
 	func send(userSelection options: [UserID], id: String, label: String, buttons: [CommunicationButton]) async throws -> Message {
 		var doptions: [(UserID, String)] = []
 		for opt in options {
-			if let member = await cache.guilds[guildID]?.member(withUserId: opt), let nick = member.nick ?? member.user?.username {
+			if
+				let member = await cache.guilds[guildID]?.member(withUserId: opt) ?? ccache.members[.init(guild: guildID, subkey: opt)],
+				let nick = member.nick ?? member.user?.username
+			{
 				doptions.append((opt, nick))
-			} else if
-				let member = try? await client.getGuildMember(guildId: guildID, userId: opt).decode(),
-				let nick = member.nick ?? member.user?.username {
-
-				doptions.append((opt, nick))
-			} else {
-				doptions.append((opt, "Unknown user"))
+				continue
 			}
+			guard let member = try? await client.getGuildMember(guildId: guildID, userId: opt).decode() else {
+				doptions.append((opt, "Unknown user"))
+				continue
+			}
+			ccache.members[.init(guild: guildID, subkey: opt)] = member
+			guard let nick = member.nick ?? member.user?.username else {
+				doptions.append((opt, "Unknown user"))
+				continue
+			}
+
+			doptions.append((opt, nick))
 		}
 		let it = try await client.createMessage(
 			channelId: channelID,
@@ -149,22 +168,24 @@ final class DiscordCommunication: Communication {
 
 	let client: any DiscordClient
 	let cache: DiscordCache
+	let ccache: CustomCache
 	let gs: GlobalState
-	init(client: any DiscordClient, cache: DiscordCache, state: GlobalState) {
+	init(client: any DiscordClient, cache: DiscordCache, ccache: CustomCache, state: GlobalState) {
 		self.client = client
 		self.cache = cache
+		self.ccache = ccache
 		self.gs = state
 	}
 
 	func getChannel(for user: UserID, state: DiscordState) async throws -> Channel? {
 		let resp = try await client.createDM(recipient_id: user)
 		let chan = try resp.decode()
-		return DiscordChannel(client: client, cache: cache, guildID: state.channel.guildID, channelID: chan.id)
+		return DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: state.channel.guildID, channelID: chan.id)
 	}
 	func createGameThread(state: DiscordState) async throws -> Channel? {
 		let thread = try await client.createThread(in: state.channel.channelID, "Mappo Game", type: nil, invitable: nil, archiveAfter: nil, rateLimitPerUser: nil)
 		let threadO = try thread.decode()
-		return DiscordChannel(client: client, cache: cache, guildID: threadO.guild_id!, channelID: threadO.id)
+		return DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: threadO.guild_id!, channelID: threadO.id)
 	}
 	func archive(_ id: Channel, state: DiscordState) async throws {
 		// _ = try await bot.modifyChannel(id.channel.id, with: ["archived": true, "locked": true])
@@ -215,13 +236,15 @@ class MyBot {
 	let gs: GlobalState
 	let client: any DiscordClient
 	let cache: DiscordCache
+	let ccache: CustomCache
 	let comm: DiscordCommunication
 	let ev: any EventLoop
 	init(client: any DiscordClient, cache: DiscordCache, ev: any EventLoop) {
 		self.gs = GlobalState()
+		self.ccache = CustomCache()
 		self.client = client
 		self.cache = cache
-		self.comm = DiscordCommunication(client: client, cache: cache, state: self.gs)
+		self.comm = DiscordCommunication(client: client, cache: cache, ccache: ccache, state: self.gs)
 		self.ev = ev
 	}
 	func state(for channel: Snowflake) async throws -> DiscordState {
@@ -234,7 +257,7 @@ class MyBot {
 		guard let gid = chann.guild_id else {
 			throw NotFound()
 		}
-		self.gs.states[channel] = DiscordState(for: DiscordChannel(client: client, cache: cache, guildID: gid, channelID: channel), in: comm, eventLoop: ev)
+		self.gs.states[channel] = DiscordState(for: DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: gid, channelID: channel), in: comm, eventLoop: ev)
 		return self.gs.states[channel]!
 	}
 	func dispatch(ev: Gateway.Event) async throws {

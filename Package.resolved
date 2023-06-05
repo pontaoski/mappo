@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/async-http-client.git",
       "state" : {
-        "revision" : "7f05a8da46cc2a4ab43218722298b81ac7a08031",
-        "version" : "1.13.2"
+        "revision" : "78db67e5bf4a8543075787f228e8920097319281",
+        "version" : "1.18.0"
       }
     },
     {
@@ -28,12 +28,12 @@
       }
     },
     {
-      "identity" : "discordkit",
+      "identity" : "discordbm",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pontaoski/DiscordKit.git",
+      "location" : "https://github.com/DiscordBM/DiscordBM.git",
       "state" : {
         "branch" : "main",
-        "revision" : "c0e9cb6d65aec71c5709790e462167cdbfc438ab"
+        "revision" : "8b88ae44cbc9083cc0c6331ee4d6721fccc3a19b"
       }
     },
     {
@@ -46,21 +46,12 @@
       }
     },
     {
-      "identity" : "mimetype",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/SketchMaster2001/MimeType.git",
-      "state" : {
-        "branch" : "master",
-        "revision" : "102b3769ea8dc7ed0bd50b932bdd21cd4e89215c"
-      }
-    },
-    {
       "identity" : "multipart-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",
       "state" : {
-        "revision" : "0d55c35e788451ee27222783c7d363cb88092fab",
-        "version" : "4.5.2"
+        "revision" : "1adfd69df2da08f7931d4281b257475e32c96734",
+        "version" : "4.5.4"
       }
     },
     {
@@ -77,8 +68,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-atomics.git",
       "state" : {
-        "revision" : "ff3d2212b6b093db7f177d0855adbc4ef9c5f036",
-        "version" : "1.0.3"
+        "revision" : "6c89474e62719ddcc1e9614989fff2f68208fe10",
+        "version" : "1.1.0"
       }
     },
     {
@@ -104,8 +95,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "45167b8006448c79dda4b7bd604e07a034c15c49",
-        "version" : "2.48.0"
+        "revision" : "6213ba7a06febe8fef60563a4a7d26a4085783cf",
+        "version" : "2.54.0"
       }
     },
     {
@@ -142,24 +133,6 @@
       "state" : {
         "revision" : "c0d9a144cfaec8d3d596aadde3039286a266c15c",
         "version" : "1.15.0"
-      }
-    },
-    {
-      "identity" : "swiftcord",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/SketchMaster2001/Swiftcord",
-      "state" : {
-        "branch" : "master",
-        "revision" : "6c29626580bc86cab061fa88a16defb05adda979"
-      }
-    },
-    {
-      "identity" : "websocket-kit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/vapor/websocket-kit",
-      "state" : {
-        "branch" : "main",
-        "revision" : "62f568aa9d338aa33790534fa7b5800976f93af8"
       }
     }
   ],

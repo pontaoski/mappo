@@ -6,8 +6,6 @@ import MappoCore
 import AsyncHTTPClient
 import DiscordBM
 
-typealias Snowflake = String
-
 extension CommunicationEmbed {
 	var discord: Embed {
 		switch self.color {
@@ -23,10 +21,10 @@ extension CommunicationEmbed {
 
 class DiscordMessage: Deletable {
 	let client: any DiscordClient
-	let channelID: Snowflake
-	let messageID: Snowflake
+	let channelID: ChannelSnowflake
+	let messageID: MessageSnowflake
 
-	init(client: DiscordClient, channelID: Snowflake, messageID: Snowflake) {
+	init(client: DiscordClient, channelID: ChannelSnowflake, messageID: MessageSnowflake) {
 		self.client = client
 		self.channelID = channelID
 		self.messageID = messageID
@@ -37,8 +35,8 @@ class DiscordMessage: Deletable {
 }
 
 struct GuildKey: Hashable {
-	let guild: Snowflake
-	let subkey: Snowflake
+	let guild: GuildSnowflake
+	let subkey: UserSnowflake
 }
 
 class CustomCache {
@@ -47,14 +45,14 @@ class CustomCache {
 
 class DiscordChannel: Sendable, I18nable {
 	typealias Message = DiscordMessage
-	typealias UserID = Snowflake
+	typealias UserID = UserSnowflake
 	let client: any DiscordClient
 	let cache: DiscordCache
 	let ccache: CustomCache
-	let guildID: Snowflake
-	let channelID: Snowflake
+	let guildID: GuildSnowflake
+	let channelID: ChannelSnowflake
 
-	init(client: any DiscordClient, cache: DiscordCache, ccache: CustomCache, guildID: Snowflake, channelID: Snowflake) {
+	init(client: any DiscordClient, cache: DiscordCache, ccache: CustomCache, guildID: GuildSnowflake, channelID: ChannelSnowflake) {
 		self.client = client
 		self.cache = cache
 		self.ccache = ccache
@@ -78,7 +76,7 @@ class DiscordChannel: Sendable, I18nable {
 		return Message(client: client, channelID: channelID, messageID: msg.id)
 	}
 	private func convertButton(_ btn: CommunicationButton) -> Interaction.ActionRow.Component {
-		let style: Interaction.ActionRow.Button.Style
+		let style: Interaction.ActionRow.Button.NonLinkStyle
 		switch btn.color {
 		case .bad:
 			style = .danger
@@ -127,7 +125,7 @@ class DiscordChannel: Sendable, I18nable {
 			channelId: channelID,
 			payload: .init(
 				components: [.init(components: [.stringSelect(.init(custom_id: id, options: doptions.map { (id, name) in
-					return .init(label: name, value: id)
+					return .init(label: name, value: id.rawValue)
 				}))]), .init(components: buttons.map(convertButton))].filter{$0.components.count > 0}
 			)
 		)
@@ -148,14 +146,14 @@ class DiscordInteraction: Replyable {
 		_ = try await client.createInteractionResponse(
 			id: event.id,
 			token: event.token,
-			payload: .init(type: .channelMessageWithSource, data: .init(content: with, flags: epheremal ? [.ephemeral] : []))
+			payload: .channelMessageWithSource(.init(content: with, flags: epheremal ? [.ephemeral] : []))
 		)
 	}
 	func reply(with embed: CommunicationEmbed, epheremal: Bool) async throws {
 		_ = try await client.createInteractionResponse(
 			id: event.id,
 			token: event.token,
-			payload: .init(type: .channelMessageWithSource, data: .init(embeds: [embed.discord], flags: epheremal ? [.ephemeral] : []))
+			payload: .channelMessageWithSource(.init(embeds: [embed.discord], flags: epheremal ? [.ephemeral] : []))
 		)
 	}
 }
@@ -163,7 +161,7 @@ class DiscordInteraction: Replyable {
 final class DiscordCommunication: Communication {
 	typealias Channel = DiscordChannel
 	typealias Message = DiscordMessage
-	typealias UserID = Snowflake
+	typealias UserID = UserSnowflake
 	typealias Interaction = DiscordInteraction
 
 	let client: any DiscordClient
@@ -178,29 +176,29 @@ final class DiscordCommunication: Communication {
 	}
 
 	func getChannel(for user: UserID, state: DiscordState) async throws -> Channel? {
-		let resp = try await client.createDM(recipient_id: user)
+		let resp = try await client.createDm(payload: .init(recipient_id: user))
 		let chan = try resp.decode()
 		return DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: state.channel.guildID, channelID: chan.id)
 	}
 	func createGameThread(state: DiscordState) async throws -> Channel? {
-		let thread = try await client.createThread(in: state.channel.channelID, "Mappo Game", type: nil, invitable: nil, archiveAfter: nil, rateLimitPerUser: nil)
+		let thread = try await client.createThread(channelId: state.channel.channelID, payload: .init(name: "Mappo", type: .privateThread))
 		let threadO = try thread.decode()
 		return DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: threadO.guild_id!, channelID: threadO.id)
 	}
 	func archive(_ id: Channel, state: DiscordState) async throws {
-		// _ = try await bot.modifyChannel(id.channel.id, with: ["archived": true, "locked": true])
+		_ = try await client.updateThreadChannel(id: id.channelID, reason: nil, payload: .init(archived: true, locked: true))
 	}
 	func currentParty(of user: UserID, state: DiscordState) async throws -> DiscordState? {
-		return gs.states[user]
+		return gs.userStates[user]
 	}
 	func onPrepareJoined(_ user: UserID, state: DiscordState) async throws {
-		gs.states[user] = state
+		gs.userStates[user] = state
 	}
 	func onJoined(_ user: UserID, state: DiscordState) async throws {
-		gs.states[user] = state
+		gs.userStates[user] = state
 	}
 	func onLeft(_ user: UserID, state: DiscordState) async throws {
-		gs.states.removeValue(forKey: user)
+		gs.userStates.removeValue(forKey: user)
 	}
 }
 
@@ -218,7 +216,8 @@ extension Collection where Self.Element: Comparable {
 }
 
 class GlobalState {
-	var states: [Snowflake: DiscordState] = [:]
+	var channelStates: [ChannelSnowflake: DiscordState] = [:]
+	var userStates: [UserSnowflake: DiscordState] = [:]
 }
 
 // let commands = [
@@ -247,8 +246,8 @@ class MyBot {
 		self.comm = DiscordCommunication(client: client, cache: cache, ccache: ccache, state: self.gs)
 		self.ev = ev
 	}
-	func state(for channel: Snowflake) async throws -> DiscordState {
-		if let chan = gs.states[channel] {
+	func state(for channel: ChannelSnowflake) async throws -> DiscordState {
+		if let chan = gs.channelStates[channel] {
 			return chan
 		}
 
@@ -257,8 +256,8 @@ class MyBot {
 		guard let gid = chann.guild_id else {
 			throw NotFound()
 		}
-		self.gs.states[channel] = DiscordState(for: DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: gid, channelID: channel), in: comm, eventLoop: ev)
-		return self.gs.states[channel]!
+		self.gs.channelStates[channel] = DiscordState(for: DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: gid, channelID: channel), in: comm, eventLoop: ev)
+		return self.gs.channelStates[channel]!
 	}
 	func dispatch(ev: Gateway.Event) async throws {
 		guard case .interactionCreate(let woot) = ev.data else {
@@ -281,14 +280,14 @@ class MyBot {
 			case .applicationCommand(let data):
 				try await slashCommandEvent(cmd: data.name, user: user, opts: data.options, intr: intr)
 			case .messageComponent(let data):
-				switch data.componentType {
+				switch data.component_type {
 				case .stringSelect:
-					guard let value = data.values?.first?.asString else {
+					guard let value = data.values?.first else {
 						return
 					}
-					try await selectMenuEvent(id: data.customID, target: value, user: user, intr: intr)
+					try await selectMenuEvent(id: data.custom_id, target: value, user: user, intr: intr)
 				case .button:
-					try await buttonClickEvent(btn: data.customID, user: user, intr: intr)
+					try await buttonClickEvent(btn: data.custom_id, user: user, intr: intr)
 				default:
 					()
 				}
@@ -300,7 +299,7 @@ class MyBot {
 			_ = try await client.createMessage(channelId: intr.event.channel_id!, payload: .init(content: "I had an error: \(error)"))
 		}
 	}
-	func slashCommandEvent(cmd: String, user: DiscordUser, opts: [Interaction.ApplicationCommandData.Option]?, intr: DiscordInteraction) async throws {
+	func slashCommandEvent(cmd: String, user: DiscordUser, opts: [Interaction.ApplicationCommand.Option]?, intr: DiscordInteraction) async throws {
 		let state = try await self.state(for: intr.event.channel_id!)
 
 		if let command = state.arglessCommands[cmd] {
@@ -316,18 +315,14 @@ class MyBot {
 				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
 				return
 			}
-			try await command(state)(user.id, val, intr)
+			try await command(state)(user.id, UserSnowflake(val), intr)
 		} else {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(cmd)). Sorry.", epheremal: true)
 		}
 	}
 	func selectMenuEvent(id: String, target: String, user: DiscordUser, intr: DiscordInteraction) async throws {
-		guard let targ = UInt64(target) else {
-			try await intr.reply(with: "Oops, I didn't understand your target, sorry.", epheremal: true)
-			return
-		}
-		let target = Snowflake(targ)
-		guard let state = gs.states[user.id] else {
+		let target = UserSnowflake(target)
+		guard let state = gs.userStates[user.id] else {
 			try await intr.reply(with: "Oops, it doesnt look like you're in a game, sorry.", epheremal: true)
 			return
 		}
@@ -339,7 +334,7 @@ class MyBot {
 		}
 	}
 	func buttonClickEvent(btn: String, user: DiscordUser, intr: DiscordInteraction) async throws {
-		guard let state = gs.states[user.id] else {
+		guard let state = gs.userStates[user.id] else {
 			try await intr.reply(with: "Oops, it doesnt look like you're in a game, sorry.", epheremal: true)
 			return
 		}
@@ -357,11 +352,11 @@ struct MappoMain {
 	static func actualMain(client httpClient: HTTPClient) async {
 		let config = try! JSONDecoder().decode(Config.self,  from: try! String(contentsOfFile: "config.json").data(using: .utf8)!)
 
-		let bot = BotGatewayManager(
+		let bot = await BotGatewayManager(
 			eventLoopGroup: httpClient.eventLoopGroup,
 			httpClient: httpClient,
 			token: config.token,
-			appId: config.appID,
+			appId: ApplicationSnowflake(config.appID),
 			intents: [.guildMessages, .guildMembers, .messageContent]
 		)
 		let cache = await DiscordCache(
@@ -371,17 +366,18 @@ struct MappoMain {
 		)
 		let mappoBot = MyBot(client: bot.client, cache: cache, ev: httpClient.eventLoopGroup.next())
 
-		await bot.addEventHandler { ev in
+		await bot.connect()
+
+		let stream = await bot.makeEventsStream()
+		for await event in stream {
 			let _ = httpClient.eventLoopGroup.makeFutureWithTask {
 				do {
-					try await mappoBot.dispatch(ev: ev)
+					try await mappoBot.dispatch(ev: event)
 				} catch {
 					print(error)
 				}
 			}
 		}
-
-		await bot.connect()
 	}
 	static func main() {
 		let httpClient = HTTPClient(eventLoopGroupProvider: .createNew)

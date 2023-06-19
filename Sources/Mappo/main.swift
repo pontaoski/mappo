@@ -24,7 +24,7 @@ class DiscordMessage: Deletable {
 	let channelID: ChannelSnowflake
 	let messageID: MessageSnowflake
 
-	init(client: DiscordClient, channelID: ChannelSnowflake, messageID: MessageSnowflake) {
+	init(client: any DiscordClient, channelID: ChannelSnowflake, messageID: MessageSnowflake) {
 		self.client = client
 		self.channelID = channelID
 		self.messageID = messageID
@@ -37,6 +37,12 @@ class DiscordMessage: Deletable {
 struct GuildKey: Hashable {
 	let guild: GuildSnowflake
 	let subkey: UserSnowflake
+}
+
+extension UserSnowflake: Mentionable {
+	public func mention() -> String {
+		"<@\(self.rawValue)>"
+	}
 }
 
 class CustomCache {

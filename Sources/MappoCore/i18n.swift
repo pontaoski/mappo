@@ -8,29 +8,29 @@ public protocol I18n {
     func morningTitle(_ toy: TimeOfYear, year: Int, day: Int) -> String
     func votingTitle(numNominations: Int) -> String
     func getOverHere(_ list: String) -> String
-    func beholderSeer(who: String) -> String
-    func laundrypersonStart(_ p1: String, _ p2: String, _ role: Role) -> String
-    func gossip(_ p1: String, _ p2: String, _ p3: String) -> String
-    func librarianStart(_ p1: String, _ p2: String, _ role: Role) -> String
-    func gooseKillMessage(who: String) -> String
-    func werewolfKillMessage(who: String) -> String
-    func exilingTitle(who: String) -> String
-    func notExilingTitle(who: String) -> String
-    func votingPersonTitle(who: String) -> String
-    func nightStatus(who: String, role: Role, alive: Bool) -> String
-    func drVisitAlso(who: String) -> String
-    func visitedWerewolf(who: String) -> String
-    func visitedWerewolfEaten(who: String) -> String
-    func visitedWerewolfProtected(who: String) -> String
-    func visitedPersonBeingVisitedByWerewolf(who: String, visiting: String) -> String
-    func visitedPersonBeingVisitedByWerewolfEaten(who: String) -> String
-    func visitedPersonBeingVisitedByWerewolfProtected(who: String) -> String
-    func pacifistIntervention(who: String) -> String
-    func nominatedInnocent(who: String) -> String
-    func protectedWerewolf(who: String) -> String
+    func beholderSeer(who: Mentionable) -> String
+    func laundrypersonStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String
+    func gossip(_ p1: Mentionable, _ p2: Mentionable, _ p3: Mentionable) -> String
+    func librarianStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String
+    func gooseKillMessage(who: Mentionable) -> String
+    func werewolfKillMessage(who: Mentionable) -> String
+    func exilingTitle(who: Mentionable) -> String
+    func notExilingTitle(who: Mentionable) -> String
+    func votingPersonTitle(who: Mentionable) -> String
+    func nightStatus(who: Mentionable, role: Role, alive: Bool) -> String
+    func drVisitAlso(who: Mentionable) -> String
+    func visitedWerewolf(who: Mentionable) -> String
+    func visitedWerewolfEaten(who: Mentionable) -> String
+    func visitedWerewolfProtected(who: Mentionable) -> String
+    func visitedPersonBeingVisitedByWerewolf(who: Mentionable, visiting: Mentionable) -> String
+    func visitedPersonBeingVisitedByWerewolfEaten(who: Mentionable) -> String
+    func visitedPersonBeingVisitedByWerewolfProtected(who: Mentionable) -> String
+    func pacifistIntervention(who: Mentionable) -> String
+    func nominatedInnocent(who: Mentionable) -> String
+    func protectedWerewolf(who: Mentionable) -> String
     func wasA(_ role: Role) -> String
-    func check(who: String, is role: Role) -> String
-    func check(who: String, isNot role: Role) -> String
+    func check(who: Mentionable, is role: Role) -> String
+    func check(who: Mentionable, isNot role: Role) -> String
     func victory(_ reason: VictoryReason) -> String
     func victoryTitle(_ reason: VictoryReason) -> String
 
@@ -90,9 +90,9 @@ public protocol I18n {
 }
 
 public struct English: I18n {
-    public func laundrypersonStart(_ p1: String, _ p2: String, _ role: Role) -> String { "You know that one of <@\(p1)> or <@\(p2)> is a \(roleName(role))." }
-    public func gossip(_ p1: String, _ p2: String, _ p3: String) -> String { "You know that one of <@\(p1)>, <@\(p2)>, or <@\(p3)> is evil!" }
-    public func librarianStart(_ p1: String, _ p2: String, _ role: Role) -> String { "You know that one of <@\(p1)> or <@\(p2)> is a \(roleName(role))." }
+    public func laundrypersonStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String { "You know that one of \(p1.mention()) or \(p2.mention()) is a \(roleName(role))." }
+    public func gossip(_ p1: Mentionable, _ p2: Mentionable, _ p3: Mentionable) -> String { "You know that one of \(p1.mention()), \(p2.mention()), or \(p3.mention()) is evil!" }
+    public func librarianStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String { "You know that one of \(p1.mention()) or \(p2.mention()) is a \(roleName(role))." }
 
     static var gooseDeathItems: [String] {
         [
@@ -104,20 +104,20 @@ public struct English: I18n {
         ]
     }
 
-    public func gooseKillMessage(who: String) -> String { "The Geese try to stab <@\(who)> with \(English.gooseDeathItems.randomElement()!)..." }
-    public func werewolfKillMessage(who: String) -> String { "The Werewolves try to kill <@\(who)>..." }
-    public func visitedWerewolf(who: String) -> String { "<@\(who)> decided to visit a Werewolf, uh-oh..." }
-    public func visitedWerewolfEaten(who: String) -> String { "and <@\(who)> got eaten!" }
-    public func visitedWerewolfProtected(who: String) -> String { "Luckily, <@\(who)> was protected by a Guardian Angel!" }
-    public func visitedPersonBeingVisitedByWerewolf(who: String, visiting: String) -> String { "<@\(who)> was visiting <@\(visiting)>, but unfortunately, the werewolves were visiting them too!" }
-    public func visitedPersonBeingVisitedByWerewolfEaten(who: String) -> String { "The werewolves had a tasty bonus snack! <@\(who)> got eaten by the werewolves!" }
-    public func visitedPersonBeingVisitedByWerewolfProtected(who: String) -> String { "The werewolves were going to have a bonus snack, but <@\(who)> was protected by a Guardian Angel!" }
-    public func pacifistIntervention(who: String) -> String { "The pacifist snuck <@\(who)> away from the executioner's hands! They get to live another day." }
-    public func nominatedInnocent(who: String) -> String { "<@\(who)> drew the ire of the heavens by nominating their favourite Innocent, and collapses dead due to its intervention! Oops." }
-    public func protectedWerewolf(who: String) -> String { "<@\(who)> used angelic magic to protect a werewolf. Unfortunately, the werewolf's evil magic killed <@\(who)> when the two magics collided! Oops." }
+    public func gooseKillMessage(who: Mentionable) -> String { "The Geese try to stab \(who.mention()) with \(English.gooseDeathItems.randomElement()!)..." }
+    public func werewolfKillMessage(who: Mentionable) -> String { "The Werewolves try to kill \(who.mention())..." }
+    public func visitedWerewolf(who: Mentionable) -> String { "\(who.mention()) decided to visit a Werewolf, uh-oh..." }
+    public func visitedWerewolfEaten(who: Mentionable) -> String { "and \(who.mention()) got eaten!" }
+    public func visitedWerewolfProtected(who: Mentionable) -> String { "Luckily, \(who.mention()) was protected by a Guardian Angel!" }
+    public func visitedPersonBeingVisitedByWerewolf(who: Mentionable, visiting: Mentionable) -> String { "\(who.mention()) was visiting \(visiting.mention()), but unfortunately, the werewolves were visiting them too!" }
+    public func visitedPersonBeingVisitedByWerewolfEaten(who: Mentionable) -> String { "The werewolves had a tasty bonus snack! \(who.mention()) got eaten by the werewolves!" }
+    public func visitedPersonBeingVisitedByWerewolfProtected(who: Mentionable) -> String { "The werewolves were going to have a bonus snack, but \(who.mention()) was protected by a Guardian Angel!" }
+    public func pacifistIntervention(who: Mentionable) -> String { "The pacifist snuck \(who.mention()) away from the executioner's hands! They get to live another day." }
+    public func nominatedInnocent(who: Mentionable) -> String { "\(who.mention()) drew the ire of the heavens by nominating their favourite Innocent, and collapses dead due to its intervention! Oops." }
+    public func protectedWerewolf(who: Mentionable) -> String { "\(who.mention()) used angelic magic to protect a werewolf. Unfortunately, the werewolf's evil magic killed \(who.mention()) when the two magics collided! Oops." }
     public func wasA(_ role: Role) -> String { "was a \(roleName(role))" }
-    public func check(who: String, is role: Role) -> String { "<@\(who)> is a \(roleName(role))!" }
-    public func check(who: String, isNot role: Role) -> String { "<@\(who)> is not a \(roleName(role))!" }
+    public func check(who: Mentionable, is role: Role) -> String { "\(who.mention()) is a \(roleName(role))!" }
+    public func check(who: Mentionable, isNot role: Role) -> String { "\(who.mention()) is not a \(roleName(role))!" }
     public func victory(_ reason: VictoryReason) -> String {
         switch reason {
         case .allWerewolvesDead: return "All the werewolves are dead!"
@@ -190,30 +190,30 @@ public struct English: I18n {
     {
 
     }
-    public func drVisitAlso(who: String) -> String {
-        "You died because you were visiting <@\(who)>, but unfortunately, a werewolf was visiting them too!"
+    public func drVisitAlso(who: Mentionable) -> String {
+        "You died because you were visiting \(who.mention()), but unfortunately, a werewolf was visiting them too!"
     }
-    public func nightStatus(who: String, role: Role, alive: Bool) -> String {
+    public func nightStatus(who: Mentionable, role: Role, alive: Bool) -> String {
         if alive {
-            return ":slight_smile: <@\(who)>"
+            return ":slight_smile: \(who.mention())"
         } else {
-            return ":skull: <@\(who)> (was a \(roleName(role)))" // TODO: should we show people's roles when they die?
+            return ":skull: \(who.mention()) (was a \(roleName(role)))" // TODO: should we show people's roles when they die?
         }
     }
-    public func beholderSeer(who: String) -> String {
-        return "The Seer is <@\(who)>"
+    public func beholderSeer(who: Mentionable) -> String {
+        return "The Seer is \(who.mention())"
     }
     public func getOverHere(_ list: String) -> String {
         return "\(list), get over here!"
     }
-    public func exilingTitle(who: String) -> String {
-        return "Looks like we're exiling <@\(who)> tonight! Bye-bye!"
+    public func exilingTitle(who: Mentionable) -> String {
+        return "Looks like we're exiling \(who.mention()) tonight! Bye-bye!"
     }
-    public func notExilingTitle(who: String) -> String {
-        return "Looks like we're not exiling <@\(who)> tonight!"
+    public func notExilingTitle(who: Mentionable) -> String {
+        return "Looks like we're not exiling \(who.mention()) tonight!"
     }
-    public func votingPersonTitle(who: String) -> String {
-        return "Are we voting out <@\(who)> tonight? You have 15 seconds to vote."
+    public func votingPersonTitle(who: Mentionable) -> String {
+        return "Are we voting out \(who.mention()) tonight? You have 15 seconds to vote."
     }
     public func votingTitle(numNominations: Int) -> String {
         return "Let's go through all of the nominations! We have \(numNominations) of them tonight. We'll stop if and when we vote someone out."
@@ -339,9 +339,9 @@ public struct English: I18n {
 }
 
 public struct TokiPona: I18n {
-    public func laundrypersonStart(_ p1: String, _ p2: String, _ role: Role) -> String { "sina sona e ni: wan lon kulupu pi <@\(p1)> en <@\(p2)> li \(roleName(role))." }
-    public func gossip(_ p1: String, _ p2: String, _ p3: String) -> String { "sina sona e ni: wan lon kulupu pi <@\(p1)> en <@\(p2)> en <@\(p3)> li ike!" }
-    public func librarianStart(_ p1: String, _ p2: String, _ role: Role) -> String { "sina sona e ni: wan lon kulupu pi <@\(p1)> en <@\(p2)> li \(roleName(role))." }
+    public func laundrypersonStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String { "sina sona e ni: wan lon kulupu pi \(p1.mention()) en \(p2.mention()) li \(roleName(role))." }
+    public func gossip(_ p1: Mentionable, _ p2: Mentionable, _ p3: Mentionable) -> String { "sina sona e ni: wan lon kulupu pi \(p1.mention()) en \(p2.mention()) en \(p3.mention()) li ike!" }
+    public func librarianStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String { "sina sona e ni: wan lon kulupu pi \(p1.mention()) en \(p2.mention()) li \(roleName(role))." }
 
     static var gooseDeathItems: [String] {
         [
@@ -353,20 +353,20 @@ public struct TokiPona: I18n {
         ]
     }
 
-    public func gooseKillMessage(who: String) -> String { "waso li alasa moli e <@\(who)> kepeken \(English.gooseDeathItems.randomElement()!)..." }
-    public func werewolfKillMessage(who: String) -> String { "soweli mun li alasa moli e <@\(who)>..." }
-    public func visitedWerewolf(who: String) -> String { "<@\(who)> li tawa tomo pi soweli mun, pakala..." }
-    public func visitedWerewolfEaten(who: String) -> String { "<@\(who)> li kama moku!" }
-    public func visitedWerewolfProtected(who: String) -> String { "pona a! jan awen sewi li awen e <@\(who)>!" }
-    public func visitedPersonBeingVisitedByWerewolf(who: String, visiting: String) -> String { "<@\(who)> li tawa tomo pi <@\(visiting)>. ike la, soweli mun li tawa tomo sama!" }
-    public func visitedPersonBeingVisitedByWerewolfEaten(who: String) -> String { "soweli mun li jo e moku kin! <@\(who)> li kama moku a!" }
-    public func visitedPersonBeingVisitedByWerewolfProtected(who: String) -> String { "tenpo ante la soweli mun li jo e moku kin. taso tenpo ni la jan awen sewi li awen e <@\(who)>!" }
-    public func pacifistIntervention(who: String) -> String { "jan pi utala ala li weka e <@\(who)> tan tomo moli! ona li moli ala!" }
-    public func nominatedInnocent(who: String) -> String { "<@\(who)> li wile weka e jan pi ike ala! ni li ike suli tawa kulupu sewi! ona li kama moli tan ni. pakala." }
-    public func protectedWerewolf(who: String) -> String { "<@\(who)> li awen e soweli mun. taso wawa ike pi soweli mun li moli e ona! pakala." }
+    public func gooseKillMessage(who: Mentionable) -> String { "waso li alasa moli e \(who.mention()) kepeken \(English.gooseDeathItems.randomElement()!)..." }
+    public func werewolfKillMessage(who: Mentionable) -> String { "soweli mun li alasa moli e \(who.mention())..." }
+    public func visitedWerewolf(who: Mentionable) -> String { "\(who.mention()) li tawa tomo pi soweli mun, pakala..." }
+    public func visitedWerewolfEaten(who: Mentionable) -> String { "\(who.mention()) li kama moku!" }
+    public func visitedWerewolfProtected(who: Mentionable) -> String { "pona a! jan awen sewi li awen e \(who.mention())!" }
+    public func visitedPersonBeingVisitedByWerewolf(who: Mentionable, visiting: Mentionable) -> String { "\(who.mention()) li tawa tomo pi \(visiting.mention()). ike la, soweli mun li tawa tomo sama!" }
+    public func visitedPersonBeingVisitedByWerewolfEaten(who: Mentionable) -> String { "soweli mun li jo e moku kin! \(who.mention()) li kama moku a!" }
+    public func visitedPersonBeingVisitedByWerewolfProtected(who: Mentionable) -> String { "tenpo ante la soweli mun li jo e moku kin. taso tenpo ni la jan awen sewi li awen e \(who.mention())!" }
+    public func pacifistIntervention(who: Mentionable) -> String { "jan pi utala ala li weka e \(who.mention()) tan tomo moli! ona li moli ala!" }
+    public func nominatedInnocent(who: Mentionable) -> String { "\(who.mention()) li wile weka e jan pi ike ala! ni li ike suli tawa kulupu sewi! ona li kama moli tan ni. pakala." }
+    public func protectedWerewolf(who: Mentionable) -> String { "\(who.mention()) li awen e soweli mun. taso wawa ike pi soweli mun li moli e ona! pakala." }
     public func wasA(_ role: Role) -> String { "li \(roleName(role))" }
-    public func check(who: String, is role: Role) -> String { "<@\(who)> li \(roleName(role))!" }
-    public func check(who: String, isNot role: Role) -> String { "<@\(who)> li \(roleName(role)) ala!" }
+    public func check(who: Mentionable, is role: Role) -> String { "\(who.mention()) li \(roleName(role))!" }
+    public func check(who: Mentionable, isNot role: Role) -> String { "\(who.mention()) li \(roleName(role)) ala!" }
     public func victory(_ reason: VictoryReason) -> String {
         switch reason {
         case .allWerewolvesDead: return "kulupu ike li moli!"
@@ -439,30 +439,30 @@ public struct TokiPona: I18n {
     {
 
     }
-    public func drVisitAlso(who: String) -> String {
-        "You died because you were visiting <@\(who)>, but unfortunately, a werewolf was visiting them too!"
+    public func drVisitAlso(who: Mentionable) -> String {
+        "You died because you were visiting \(who.mention()), but unfortunately, a werewolf was visiting them too!"
     }
-    public func nightStatus(who: String, role: Role, alive: Bool) -> String {
+    public func nightStatus(who: Mentionable, role: Role, alive: Bool) -> String {
         if alive {
-            return ":slight_smile: <@\(who)>"
+            return ":slight_smile: \(who.mention())"
         } else {
-            return ":skull: <@\(who)> (li \(roleName(role)))" // TODO: should we show people's roles when they die?
+            return ":skull: \(who.mention()) (li \(roleName(role)))" // TODO: should we show people's roles when they die?
         }
     }
-    public func beholderSeer(who: String) -> String {
-        return "jan lukin li <@\(who)>"
+    public func beholderSeer(who: Mentionable) -> String {
+        return "jan lukin li \(who.mention())"
     }
     public func getOverHere(_ list: String) -> String {
         return "\(list), o kama ni!"
     }
-    public func exilingTitle(who: String) -> String {
-        return "lukin la, jan li wile weka e <@\(who)>! tawa pona a!"
+    public func exilingTitle(who: Mentionable) -> String {
+        return "lukin la, jan li wile weka e \(who.mention())! tawa pona a!"
     }
-    public func notExilingTitle(who: String) -> String {
-        return "lukin la, jan li wile ala weka e <@\(who)>!"
+    public func notExilingTitle(who: Mentionable) -> String {
+        return "lukin la, jan li wile ala weka e \(who.mention())!"
     }
-    public func votingPersonTitle(who: String) -> String {
-        return "sina wile ala wile weka e <@\(who)>? tenpo 15s li lon."
+    public func votingPersonTitle(who: Mentionable) -> String {
+        return "sina wile ala wile weka e \(who.mention())? tenpo 15s li lon."
     }
     public func votingTitle(numNominations: Int) -> String {
         return "Let's go through all of the nominations! We have \(numNominations) of them tonight. We'll stop if and when we vote someone out."

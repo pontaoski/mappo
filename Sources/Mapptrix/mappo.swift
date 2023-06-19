@@ -4,7 +4,7 @@ import Foundation
 
 class MatrixChannel: Sendable, I18nable {
 	typealias Message = MatrixMessage
-	typealias UserID = String
+	typealias UserID = Mapptrix.UserID
 
 	let client: MatrixClient
 	let room: String
@@ -58,7 +58,7 @@ class MatrixChannel: Sendable, I18nable {
 		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0])'>\(options[$0])</a>: send m?\(id) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
 		let plainBody = options.indices.map { "\(options[$0]): send m?\(id) \($0)" }.joined(separator: "\n") + plainBodyBtn
 
-		activeSelections[room] = options
+		activeSelections[room] = options.map{$0.id}
 
 		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(html: htmlPrefix + htmlBody, plaintext: plainPrefix + plainBody))
 		return MatrixMessage(client: client, room: room, messageID: msg)
@@ -97,8 +97,15 @@ class MatrixMessage: Deletable, Replyable {
 	}
 }
 
+struct UserID: Mentionable, Hashable {
+	let id: String
+	func mention() -> String {
+		"<@\(id)>"
+	}
+}
+
 final class MatrixCommunication: Communication {
-	typealias UserID = String
+	typealias UserID = Mapptrix.UserID
 	typealias Channel = MatrixChannel
 	typealias Message = MatrixMessage
 	typealias Interaction = MatrixMessage
@@ -110,7 +117,7 @@ final class MatrixCommunication: Communication {
 	}
 
 	func getChannel(for userID: UserID, state: State<MatrixCommunication>) async throws -> Channel? {
-		let dmID = try await client.getDM(for: userID)
+		let dmID = try await client.getDM(for: userID.id)
 		return MatrixChannel(client: client, room: dmID)
 	}
 
@@ -122,20 +129,20 @@ final class MatrixCommunication: Communication {
 		// nothing
 	}
 
-	func currentParty(of user: String, state: State<MatrixCommunication>) async throws -> State<MatrixCommunication>? {
-		return users[user]
+	func currentParty(of user: UserID, state: State<MatrixCommunication>) async throws -> State<MatrixCommunication>? {
+		return users[user.id]
 	}
 
-	func onPrepareJoined(_ user: String, state: State<MatrixCommunication>) async throws {
-		users[user] = state
+	func onPrepareJoined(_ user: UserID, state: State<MatrixCommunication>) async throws {
+		users[user.id] = state
 	}
 
 	func onJoined(_ user: UserID, state: State<MatrixCommunication>) async throws {
-		users[user] = state
+		users[user.id] = state
 	}
 
 	func onLeft(_ user: UserID, state: State<MatrixCommunication>) async throws {
-		users.removeValue(forKey: user)
+		users.removeValue(forKey: user.id)
 	}
 }
 
@@ -214,7 +221,7 @@ final class MatrixMappo {
 				return // TODO: not in game
 			}
 			if let button = state.buttons[String(content.body.dropFirst(2))] {
-				try await button(state)(event.sender!, message)
+				try await button(state)(UserID(id: event.sender!), message)
 			}
 			break
 		case "m?": // user selection
@@ -232,13 +239,13 @@ final class MatrixMappo {
 				return // TODO: complain about invalid selection
 			}
 			if let dropdown = state.userDropdowns[String(split[0])] {
-				try await dropdown(state)(event.sender!, target, message)
+				try await dropdown(state)(UserID(id: event.sender!), UserID(id: target), message)
 			}
 			break
 		case "m.":
 			let command = String(content.body.dropFirst(2))
 			if let cmd = event.state.arglessCommands[command] {
-				try await cmd(event.state)(event.sender!, message)
+				try await cmd(event.state)(UserID(id: event.sender!), message)
 			}
 			break
 		default:

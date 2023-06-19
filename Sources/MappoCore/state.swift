@@ -275,8 +275,12 @@ public protocol Replyable {
 	func reply(with: CommunicationEmbed, epheremal: Bool) async throws
 }
 
+public protocol Mentionable {
+	func mention() -> String
+}
+
 public protocol Communication {
-	associatedtype UserID
+	associatedtype UserID: Mentionable
 	associatedtype Channel: Sendable & I18nable where Channel.Message == Self.Message, Channel.UserID == Self.UserID
 	associatedtype Message: Deletable
 	associatedtype Interaction: Replyable
@@ -457,7 +461,7 @@ public class State<Comm: Communication> {
 					CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role))
 				)
 			} catch {
-				_ = try await channel.send("I can't DM <@\(user)>! \(error)")
+				_ = try await channel.send("I can't DM \(user.mention())! \(error)")
 			}
 		}
 	}
@@ -472,13 +476,13 @@ public class State<Comm: Communication> {
 				let role = roles[item]!
 				let alive = alive[item]! ? ":slight_smile:" : ":skull:"
 				let won = teams[item] == reason.winningTeam ? ":trophy:" : ":x:"
-				return "\(won)\(alive) <@\(item)> (\(i18n.wasA(role)))"
+				return "\(won)\(alive) \(item.mention()) (\(i18n.wasA(role)))"
 			}
 			.joined(separator: "\n")
 		_ = try await channel.send(CommunicationEmbed(title: i18n.victoryTitle(reason), body: txt))
 
-		let incoming = joinQueue.map { "<@\($0)>" }.joined(separator: "\n")
-		let outgoing = leaveQueue.map { "<@\($0)>" }.joined(separator: "\n")
+		let incoming = joinQueue.map { "\($0.mention())" }.joined(separator: "\n")
+		let outgoing = leaveQueue.map { "\($0.mention())" }.joined(separator: "\n")
 		for user in joinQueue {
 			party.append(user)
 			try await comm.onJoined(user, state: self)
@@ -544,19 +548,19 @@ public class State<Comm: Communication> {
 		_ = try await thread?.send(i18n.votingTitle(numNominations: nominees.count))
 		for nominee in nominees {
 			self.votes = [:]
-			_ = try await thread?.send(i18n.votingPersonTitle(who: "<@\(nominee)>"))
+			_ = try await thread?.send(i18n.votingPersonTitle(who: nominee))
 			_ = try await thread?.send(
 				CommunicationButton(id: "vote-yes", label: i18n.voteYes, color: .good),
 				CommunicationButton(id: "vote-no", label: i18n.voteNo, color: .bad)
 			)
 			_ = try await Task.sleep(nanoseconds: 15_000_000_000)
 			if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
-				_ = try await thread?.send(i18n.exilingTitle(who: "<@\(nominee)>"))
+				_ = try await thread?.send(i18n.exilingTitle(who: nominee))
 				_ = try await attemptKill(nominee, because: .exile)
 				try await nightStatus()
 				break
 			} else {
-				_ = try await thread?.send(i18n.notExilingTitle(who: "<@\(nominee)>"))
+				_ = try await thread?.send(i18n.notExilingTitle(who: nominee))
 			}
 		}
 
@@ -581,7 +585,7 @@ public class State<Comm: Communication> {
 		// TODO: create a thread
 		thread = try await comm.createGameThread(state: self)
 
-		let partyPings = party.map { "<@\($0)> "}.joined(separator: ", ")
+		let partyPings = party.map { "\($0.mention()) "}.joined(separator: ", ")
 		_ = try await thread?.send(i18n.getOverHere(partyPings))
 		_ = try await Task.sleep(nanoseconds: 5_000_000_000)
 
@@ -592,23 +596,23 @@ public class State<Comm: Communication> {
 				_ = try await dm?.send(CommunicationEmbed(title: i18n.jesterReminder))
 			case .beholder:
 				let seer = roles.filter { $0.value == .seer }[0]
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.beholderSeer(who: "\(seer.key)")))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.beholderSeer(who: seer.key)))
 			case .laundryperson:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .good || roles[$0]!.disposition == .neutral }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let (p1, p2) = randomize(player1, player2)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart("\(p1)", "\(p2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart(p1, p2, roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
 			case .gossip:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let player3 = party.filter{$0 != user && $0 != player1 && $0 != player2}.randomElement()!
 				let (p1, p2, p3) = randomize(player1, player2, player3)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip("\(p1)", "\(p2)", "\(p3)"))) // "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip(p1, p2, p3))) // "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"
 			case .librarian:
 				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let (p1, p2) = randomize(player1, player2)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart("\(p1)", "\(p2)", roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart(p1, p2, roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
 			default:
 				break
 			}
@@ -626,7 +630,7 @@ public class State<Comm: Communication> {
 	func nightStatus() async throws {
 		let txt = party.map { ($0, alive[$0]!) }
 			.map { item -> String in
-				i18n.nightStatus(who: "\(item.0)", role: roles[item.0]!, alive: item.1)
+				i18n.nightStatus(who: item.0, role: roles[item.0]!, alive: item.1)
 			}
 			.joined(separator: "\n")
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.aliveTitle, body: txt))
@@ -703,7 +707,7 @@ public class State<Comm: Communication> {
 		case .visitedWerewolf:
 			reason = i18n.drVisit
 		case .visitedSomeoneBeingVisitedByWerewolf(let visiting):
-			reason = i18n.drVisitAlso(who: "\(visiting)")
+			reason = i18n.drVisitAlso(who: visiting)
 		case .protectedWerewolf:
 			reason = i18n.drProtect
 		case .nominatedInnocent:
@@ -719,9 +723,9 @@ public class State<Comm: Communication> {
 		switch why {
 		case .werewolf, .goose:
 			if why == .goose {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.gooseKillMessage(who: "\(who)"))) // "The Geese try to stab <@\(who)> with \(State.gooseDeathItems.randomElement()!)..."
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.gooseKillMessage(who: who))) // "The Geese try to stab \(who.mention()) with \(State.gooseDeathItems.randomElement()!)..."
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.werewolfKillMessage(who: "\(who)"))) // "The Werewolves try to kill <@\(who)>..."
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.werewolfKillMessage(who: who))) // "The Werewolves try to kill \(who.mention())..."
 			}
 
 			try await Task.sleep(nanoseconds: 3_000_000_000)
@@ -744,38 +748,38 @@ public class State<Comm: Communication> {
 				_ = try await thread?.send(CommunicationEmbed(body: i18n.killFailure, color: .good))
 			}
 		case .visitedWerewolf:
-			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolf(who: "\(who)"), color: .bad))
+			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolf(who: who), color: .bad))
 			try await Task.sleep(nanoseconds: 3_000_000_000)
 
 			if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfProtected(who: "\(who)"), color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfProtected(who: who), color: .good))
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfEaten(who: "\(who)"), color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfEaten(who: who), color: .bad))
 
 				try await kill(who, because: .visitedWerewolf)
 			}
 		case .visitedSomeoneBeingVisitedByWerewolf(let visiting):
-			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolf(who: "\(who)", visiting: "\(visiting)"), color: .bad))
+			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolf(who: who, visiting: visiting), color: .bad))
 			try await Task.sleep(nanoseconds: 3_000_000_000)
 			if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfProtected(who: "\(who)"), color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfProtected(who: who), color: .good))
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfEaten(who: "\(who)"), color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfEaten(who: who), color: .bad))
 				try await kill(who, because: why)
 			}
 			break
 		case .exile:
 			if roles[who]?.disposition != .evil && roles.filter({ alive[$0.key]! }).contains(where: { $0.value == .pacifist}) && Double.random(in: 0...1) > 0.5 {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.pacifistIntervention(who: "\(who)"), color: .good))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.pacifistIntervention(who: who), color: .good))
 			} else {
 				try await kill(who, because: why)
 			}
 		case .nominatedInnocent:
-			_ = try await thread?.send(CommunicationEmbed(body: i18n.nominatedInnocent(who: "\(who)"), color: .bad))
+			_ = try await thread?.send(CommunicationEmbed(body: i18n.nominatedInnocent(who: who), color: .bad))
 			try await kill(who, because: why)
 		case .protectedWerewolf:
 			if Double.random(in: 0...1) > 0.5 {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.protectedWerewolf(who: "\(who)"), color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.protectedWerewolf(who: who), color: .bad))
 
 				try await kill(who, because: .protectedWerewolf)
 			}
@@ -822,15 +826,15 @@ public class State<Comm: Communication> {
 				let truth = trueWho(target: who, for: action.key)
 				let role = roles[truth]!.appearsAs(to: .seer)
 				let dm = try await comm.getChannel(for: action.key, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: "\(who)", is: role), color: .bad))
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: who, is: role), color: .bad))
 			case .oracleCheck(let who):
 				let truth = trueWho(target: who, for: action.key)
 				let possibleRoles = Set(party.filter{$0 != truth}.filter{alive[$0]!}.map{roles[$0]!}).filter{$0 != .oracle}
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				if let role = possibleRoles.randomElement() {
-					_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: "\(who)", isNot: role), color: .bad))
+					_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: who, isNot: role), color: .bad))
 				} else {
-					_ = try await dm?.send(CommunicationEmbed(body: "<@\(who)> is not a something...? I shouldn't be able to reach this game state", color: .bad))
+					_ = try await dm?.send(CommunicationEmbed(body: "\(who.mention()) is not a something...? I shouldn't be able to reach this game state", color: .bad))
 				}
 			case .kill(let who):
 				let truth = trueWho(target: who, for: action.key)
@@ -890,7 +894,7 @@ public class State<Comm: Communication> {
 				let role = roles[item]!
 				let alive = alive[item]! ? ":slight_smile:" : ":skull:"
 				let won = teams[item] == reason.winningTeam ? ":trophy:" : ":x:"
-				return "\(won)\(alive) <@\(item)> (\(i18n.wasA(role)))"
+				return "\(won)\(alive) \(item.mention()) (\(i18n.wasA(role)))"
 			}
 			.joined(separator: "\n")
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.playerStatusTitle, body: txt))
@@ -1000,7 +1004,7 @@ public class State<Comm: Communication> {
 	}
 	func party(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		_ = try await interaction.reply(
-			with: CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "<@\($0)>" }.joined(separator: "\n")),
+			with: CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "\($0.mention())" }.joined(separator: "\n")),
 			epheremal: false
 		)
 	}
@@ -1030,7 +1034,7 @@ public class State<Comm: Communication> {
 			return
 		}
 		party.swapAt(party.firstIndex(of: who)!, party.firstIndex(of: target)!)
-		try await interaction.reply(with: "<@\(target)> has been promoted to party leader!", epheremal: false)
+		try await interaction.reply(with: "\(target.mention()) has been promoted to party leader!", epheremal: false)
 	}
 	func remove(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {
@@ -1055,7 +1059,7 @@ public class State<Comm: Communication> {
 		}
 		try await comm.onLeft(target, state: self)
 		party.remove(target)
-		try await interaction.reply(with: "<@\(target)> has been removed from the party!", epheremal: false)
+		try await interaction.reply(with: "\(target.mention()) has been removed from the party!", epheremal: false)
 	}
 	func language(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {
@@ -1115,7 +1119,7 @@ public class State<Comm: Communication> {
 			try await interaction.reply(with: "You aren't an oracle!", epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to investigate <@\(target)> tonight!", epheremal: true)
+		try await interaction.reply(with: "You're going to investigate \(target.mention()) tonight!", epheremal: true)
 		actions[who] = .oracleCheck(who: target)
 	}
 
@@ -1125,10 +1129,10 @@ public class State<Comm: Communication> {
 			return
 		}
 		if timeOfYear == .earlyWinter || timeOfYear == .lateWinter {
-			try await interaction.reply(with: "You're going to freeze <@\(target)> tonight!", epheremal: false)
+			try await interaction.reply(with: "You're going to freeze \(target.mention()) tonight!", epheremal: false)
 			actions[who] = .freeze(who: target)
 		} else {
-			try await interaction.reply(with: "You're going to kill <@\(target)> tonight!", epheremal: false)
+			try await interaction.reply(with: "You're going to kill \(target.mention()) tonight!", epheremal: false)
 			actions[who] = .kill(who: target)
 		}
 	}
@@ -1137,7 +1141,7 @@ public class State<Comm: Communication> {
 			try await interaction.reply(with: "You aren't a guardian angel", epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to protect <@\(target)> tonight!", epheremal: false)
+		try await interaction.reply(with: "You're going to protect \(target.mention()) tonight!", epheremal: false)
 		actions[who] = .protect(who: target)
 	}
 	func seerInvestigate(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
@@ -1145,7 +1149,7 @@ public class State<Comm: Communication> {
 			try await interaction.reply(with: "You aren't a seer", epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to investigate <@\(target)> tonight!", epheremal: false)
+		try await interaction.reply(with: "You're going to investigate \(target.mention()) tonight!", epheremal: false)
 		actions[who] = .check(who: target)
 	}
 	func cookiesGive(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
@@ -1153,7 +1157,7 @@ public class State<Comm: Communication> {
 			try await interaction.reply(with: "You aren't a cookie person", epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to give cookies to <@\(target)> tonight!", epheremal: false)
+		try await interaction.reply(with: "You're going to give cookies to \(target.mention()) tonight!", epheremal: false)
 		actions[who] = .giveCookies(to: target)
 	}
 	func nominate(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
@@ -1162,13 +1166,13 @@ public class State<Comm: Communication> {
 			return
 		}
 
-		_ = try await interaction.reply(with: "You've successfully nominated <@\(target)>", epheremal: true)
+		_ = try await interaction.reply(with: "You've successfully nominated \(target.mention())", epheremal: true)
 		readyToNominate[who] = target
 		if roles[target] == .innocent && !nominatedBefore.contains(target) && !Role.evil.contains(roles[who]!) {
 			try await attemptKill(who, because: .nominatedInnocent)
 		}
 		nominatedBefore.insert(target)
-		_ = try await thread?.send("<@\(who)> has nominated <@\(target)>!")
+		_ = try await thread?.send("\(who.mention()) has nominated \(target.mention())!")
 		checkNominationCondition()
 	}
 	func goose(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
@@ -1176,7 +1180,7 @@ public class State<Comm: Communication> {
 			try await interaction.reply(with: "You can't goose!", epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to give goose <@\(target)> tonight!", epheremal: false)
+		try await interaction.reply(with: "You're going to give goose \(target.mention()) tonight!", epheremal: false)
 		actions[who] = .goose(who: target)
 	}
 
@@ -1201,7 +1205,7 @@ public class State<Comm: Communication> {
 
 		_ = try await interaction.reply(with: "You've voted to skip!", epheremal: true)
 		readyToNominate[who] = nil as Comm.UserID?
-		_ = try await thread?.send("<@\(who)> has voted to skip!")
+		_ = try await thread?.send("\(who.mention()) has voted to skip!")
 		checkNominationCondition()
 	}
 	func voteYes(who: Comm.UserID, interaction: Comm.Interaction) async throws {
@@ -1211,7 +1215,7 @@ public class State<Comm: Communication> {
 		}
 		votes[who] = true
 		_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
-		_ = try await thread?.send("<@\(who)> has voted yes!")
+		_ = try await thread?.send("\(who.mention()) has voted yes!")
 	}
 	func voteNo(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard alive[who] == true else {
@@ -1220,6 +1224,6 @@ public class State<Comm: Communication> {
 		}
 		votes[who] = false
 		_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
-		_ = try await thread?.send("<@\(who)> has voted no!")
+		_ = try await thread?.send("\(who.mention()) has voted no!")
 	}
 }

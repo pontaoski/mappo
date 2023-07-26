@@ -501,9 +501,11 @@ public class State<Comm: Communication> {
 	outer:
 		for _ in 0...500 {
 			assignInner()
+			print("validating \(roles)")
 
 			for (_, role) in roles {
 				guard role.isValid(with: roles.values, playerCount: party.count) else {
+					print("\(role) is not valid with the current party composition")
 					continue outer
 				}
 			}
@@ -517,6 +519,8 @@ public class State<Comm: Communication> {
 
 			let villagerPercentDifference =
 				(villagerStrength - werewolfStrength) / werewolfStrength
+
+			print("village: \(villagerStrength) werewolves: \(werewolfStrength) -- \(villagerPercentDifference)")
 
 			guard villagerPercentDifference <= 0.4 else {
 				continue outer

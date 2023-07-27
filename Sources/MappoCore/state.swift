@@ -58,18 +58,11 @@ public enum Role: CaseIterable {
 		}
 	}
 
-	func isValidCountOnly<T: Sequence>(with roles: T, playerCount count: Int) -> Bool where T.Element == Role {
+	func isValid<T: Sequence>(with roles: T, playerCount count: Int) -> Bool where T.Element == Role {
 		guard roles.filter({ $0 == self }).count < self.absoluteMax else {
 			return false
 		}
 		guard count >= self.minimumPlayerCount else {
-			return false
-		}
-		return true
-	}
-
-	func isValid<T: Sequence>(with roles: T, playerCount count: Int) -> Bool where T.Element == Role {
-		guard isValidCountOnly(with: roles, playerCount: count) else {
 			return false
 		}
 		if self == .beholder {
@@ -161,7 +154,7 @@ public enum Role: CaseIterable {
 		case .werewolf:
 			return 10
 		case .goose:
-			return 9
+			return 10
 		case .cursed:
 			return 8
 
@@ -172,6 +165,57 @@ public enum Role: CaseIterable {
 			return Double(4 * party.filter{ Role.startOfGameInfoRoles.contains($0) }.count)
 		}
 	}
+
+	private static func assignInner(_ roles: inout [Role], playerCount count: Int) {
+		func eligible(_ against: [Role]) -> [Role] {
+			return against.filter { $0.isValid(with: roles, playerCount: count) }
+		}
+
+		let shuffle = roles.indices.shuffled()
+		let evil = max(Int(round(Float(shuffle.count) * 0.29)), 1)
+		let good = max(Int(round(Float(shuffle.count) * 0.4)), 2)
+		let specials = shuffle.prefix(evil + good)
+
+		specials.prefix(evil).forEach {
+			roles[$0] = eligible(Role.evil).randomElement()!
+		}
+		specials.suffix(good).forEach {
+			roles[$0] = eligible(Role.good).randomElement()!
+		}
+
+		let neutral = max(shuffle.count - (evil + good), 0)
+		shuffle.suffix(neutral).forEach {
+			roles[$0] = eligible(Role.neutral).randomElement()!
+		}
+	}
+
+	static public func generateRoles(partySize: Int) -> [Role]? {
+	outer:
+		for _ in 0...500 {
+			var roles: [Role] = Array(repeating: .villager, count: partySize)
+
+			assignInner(&roles, playerCount: partySize)
+
+			let villagerStrength =
+				roles.filter{ $0.defaultTeam == .village }
+					.map { $0.strength(with: roles, playerCount: partySize) }
+					.reduce(0.0, (+))
+			let werewolfStrength = roles.filter{ $0.defaultTeam == .werewolf }
+					.map { $0.strength(with: roles, playerCount: partySize) }
+					.reduce(0.0, (+))
+
+			let villagerPercentDifference =
+				(villagerStrength - werewolfStrength) / werewolfStrength
+
+			guard -0.2 <= villagerPercentDifference && villagerPercentDifference <= 0.4 else {
+				continue outer
+			}
+
+			return roles
+		}
+		return nil
+	}
+
 
 	static let good: [Role] = [.guardianAngel, .seer, .oracle, .beholder, .pacifist]
 	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry, .innocent, .librarian, .gossip, .laundryperson]
@@ -474,63 +518,6 @@ public class State<Comm: Communication> {
 		day += 1
 	}
 
-	func assignInner() {
-		func eligible(_ against: [Role]) -> [Role] {
-			against.filter { $0.isValidCountOnly(with: roles.values, playerCount: party.count) }
-		}
-
-		let shuffle = party.shuffled()
-		let evil = max(Int(round(Float(shuffle.count) * 0.29)), 1)
-		let good = max(Int(round(Float(shuffle.count) * 0.4)), 2)
-		let specials = shuffle.prefix(evil + good)
-
-		specials.prefix(evil).forEach {
-			roles[$0] = eligible(Role.evil).randomElement()!
-		}
-		specials.suffix(good).forEach {
-			roles[$0] = eligible(Role.good).randomElement()!
-		}
-
-		let neutral = max(shuffle.count - (evil + good), 0)
-		shuffle.suffix(neutral).forEach {
-			roles[$0] = eligible(Role.neutral).randomElement()!
-		}
-	}
-
-	func assignAndValidateRoles() -> Bool {
-	outer:
-		for _ in 0...500 {
-			assignInner()
-			print("validating \(roles)")
-
-			for (_, role) in roles {
-				guard role.isValid(with: roles.values, playerCount: party.count) else {
-					print("\(role) is not valid with the current party composition")
-					continue outer
-				}
-			}
-			let villagerStrength =
-				roles.values.filter{ $0.defaultTeam == .village }
-					.map { $0.strength(with: roles.values, playerCount: party.count) }
-					.reduce(0.0, (+))
-			let werewolfStrength = roles.values.filter{ $0.defaultTeam == .werewolf }
-					.map { $0.strength(with: roles.values, playerCount: party.count) }
-					.reduce(0.0, (+))
-
-			let villagerPercentDifference =
-				(villagerStrength - werewolfStrength) / werewolfStrength
-
-			print("village: \(villagerStrength) werewolves: \(werewolfStrength) -- \(villagerPercentDifference)")
-
-			guard villagerPercentDifference <= 0.4 else {
-				continue outer
-			}
-
-			return true
-		}
-		return false
-	}
-
 	func assignRoles() async throws {
 		clear()
 
@@ -544,12 +531,16 @@ public class State<Comm: Communication> {
 			alive[$0] = true
 		}
 
-		guard assignAndValidateRoles() else {
+		guard let shuffledRoles = Role.generateRoles(partySize: party.count) else {
 			state = .waiting
 
 			_ = try await channel.send("Failed to shuffle a balanced party, please reroll! If this happens too often, contact Janet.")
 
 			return
+		}
+
+		shuffledRoles.indices.forEach { idx in
+			roles[party[idx]] = shuffledRoles[idx]
 		}
 
 		party.forEach {

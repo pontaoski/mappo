@@ -811,6 +811,22 @@ public class State<Comm: Communication> {
 		}
 		_ = try await dm?.send(CommunicationEmbed(body: reason, color: .bad))
 		alive[who] = false
+
+		if roles[who] == .werewolf && !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }) {
+			let curseds = roles.filter({ $0.value == .cursed })
+			for cursed in curseds.keys {
+				roles[cursed] = .werewolf
+				let dm = try await comm.getChannel(for: cursed, state: self)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.cursedIsWerewolfNow, color: .good))
+			}
+		}
+		if roles[who] == .werewolf && !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }) {
+			let geese = roles.filter({ $0.value == .goose })
+			for goose in geese.keys {
+				let dm = try await comm.getChannel(for: goose, state: self)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.gooseIsViolentNow, color: .good))
+			}
+		}
 	}
 
 	func attemptKill(_ who: Comm.UserID, because why: DeathReason<Comm>) async throws {
@@ -876,21 +892,6 @@ public class State<Comm: Communication> {
 				_ = try await thread?.send(CommunicationEmbed(body: i18n.protectedWerewolf(who: who), color: .bad))
 
 				try await kill(who, because: .protectedWerewolf)
-			}
-		}
-		if roles[who] == .werewolf && roles.contains(where: { $0.value == .cursed }) {
-			let curseds = roles.filter({ $0.value == .cursed })
-			for cursed in curseds.keys {
-				roles[cursed] = .werewolf
-				let dm = try await comm.getChannel(for: cursed, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.cursedIsWerewolfNow, color: .good))
-			}
-		}
-		if !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }) {
-			let geese = roles.filter({ $0.value == .goose })
-			for goose in geese.keys {
-				let dm = try await comm.getChannel(for: goose, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.gooseIsViolentNow, color: .good))
 			}
 		}
 		try await handlePossibleWin(whoDied: who, why: why)

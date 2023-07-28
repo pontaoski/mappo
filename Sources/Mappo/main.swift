@@ -93,7 +93,7 @@ class DiscordChannel: Sendable, I18nable {
 		case .neutral:
 			style = .secondary
 		}
-		return .button(.init(style: style, label: btn.label, custom_id: btn.id))
+		return .button(.init(style: style, label: btn.label, custom_id: btn.id.rawValue))
 	}
 	func send(_ buttons: [CommunicationButton]) async throws -> Message {
 		let it = try await client.createMessage(
@@ -105,7 +105,7 @@ class DiscordChannel: Sendable, I18nable {
 		let msg = try it.decode()
 		return Message(client: client, channelID: channelID, messageID: msg.id)
 	}
-	func send(userSelection options: [UserID], id: String, label: String, buttons: [CommunicationButton]) async throws -> Message {
+	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
 		var doptions: [(UserID, String)] = []
 		for opt in options {
 			if
@@ -130,7 +130,7 @@ class DiscordChannel: Sendable, I18nable {
 		let it = try await client.createMessage(
 			channelId: channelID,
 			payload: .init(
-				components: [.init(components: [.stringSelect(.init(custom_id: id, options: doptions.map { (id, name) in
+				components: [.init(components: [.stringSelect(.init(custom_id: id.rawValue, options: doptions.map { (id, name) in
 					return .init(label: name, value: id.rawValue)
 				}))]), .init(components: buttons.map(convertButton))].filter{$0.components.count > 0}
 			)
@@ -333,7 +333,8 @@ class MyBot {
 			return
 		}
 
-		if let dropdown = state.userDropdowns[id] {
+		if let susID = SingleUserSelectionID.init(rawValue: id),
+			let dropdown = state.singleUserDropdowns[susID] {
 			try await dropdown(state)(user.id, target, intr)
 		} else {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(id)). Sorry.", epheremal: true)
@@ -345,7 +346,8 @@ class MyBot {
 			return
 		}
 
-		if let button = state.buttons[btn] {
+		if let buttonID = ButtonID(rawValue: btn),
+			let button = state.buttons[buttonID] {
 			try await button(state)(user.id, intr)
 		} else {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(btn)). Sorry.", epheremal: true)

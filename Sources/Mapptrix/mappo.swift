@@ -47,7 +47,7 @@ class MatrixChannel: Sendable, I18nable {
 		return MatrixMessage(client: client, room: room, messageID: msg)
 	}
 
-	func send(userSelection options: [UserID], id: String, label: String, buttons: [CommunicationButton]) async throws -> Message {
+	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
 		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML)</h4>\n"
 		let plainPrefix = "\(label.replacingMentionsWithPlaintext)\n\n"
 
@@ -220,7 +220,8 @@ final class MatrixMappo {
 			guard let state = users[event.sender!] else {
 				return // TODO: not in game
 			}
-			if let button = state.buttons[String(content.body.dropFirst(2))] {
+			if let buttonID = ButtonID.init(rawValue: String(content.body.dropFirst(2))),
+				let button = state.buttons[buttonID] {
 				try await button(state)(UserID(id: event.sender!), message)
 			}
 			break
@@ -238,7 +239,8 @@ final class MatrixMappo {
 			guard let target = activeSelections[event.roomID!]?[num] else {
 				return // TODO: complain about invalid selection
 			}
-			if let dropdown = state.userDropdowns[String(split[0])] {
+			if let susID = SingleUserSelectionID.init(rawValue: String(split[0])),
+				let dropdown = state.singleUserDropdowns[susID] {
 				try await dropdown(state)(UserID(id: event.sender!), UserID(id: target), message)
 			}
 			break

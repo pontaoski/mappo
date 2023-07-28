@@ -328,15 +328,31 @@ public struct CommunicationButton {
 	public enum Color {
 		case neutral, good, bad, bright
 	}
-	public let id: String
+	public let id: ButtonID
 	public let label: String
 	public let color: Color
 
-	public init(id: String, label: String, color: Color = .neutral) {
+	public init(id: ButtonID, label: String, color: Color = .neutral) {
 		self.id = id
 		self.label = label
 		self.color = color
 	}
+}
+
+public enum SingleUserSelectionID: String {
+	case werewolfKill = "werewolf-kill"
+	case guardianAngelProtect = "guardian-angel-protect"
+	case seerInvestigate = "seer-investigate"
+	case oracleInvestigate = "oracle-investigate"
+	case cookiesGive = "cookies-give"
+	case goose = "goose"
+	case nominate = "nominate"
+}
+
+public enum ButtonID: String {
+	case nominateSkip = "nominate-skip"
+	case voteYes = "vote-yes"
+	case voteNo = "vote-no"
 }
 
 public protocol Sendable {
@@ -346,11 +362,11 @@ public protocol Sendable {
 	func send(_ text: String) async throws -> Message
 	func send(_ embed: CommunicationEmbed) async throws -> Message
 	func send(_ buttons: [CommunicationButton]) async throws -> Message
-	func send(userSelection options: [UserID], id: String, label: String, buttons: [CommunicationButton]) async throws -> Message
+	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
 }
 
 public extension Sendable {
-	func send(userSelection options: [UserID], id: String, label: String) async throws -> Message {
+	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String) async throws -> Message {
 		try await self.send(userSelection: options, id: id, label: label, buttons: [])
 	}
 }
@@ -363,7 +379,7 @@ public extension Sendable {
 	func send(_ buttons: CommunicationButton...) async throws -> Message {
 		try await self.send(buttons)
 	}
-	func send(userSelection options: Set<UserID>, id: String, label: String) async throws -> Message {
+	func send(userSelection options: Set<UserID>, id: SingleUserSelectionID, label: String) async throws -> Message {
 		try await self.send(userSelection: Array(options), id: id, label: label)
 	}
 }
@@ -623,9 +639,9 @@ public class State<Comm: Communication> {
 		_ = try await thread?.send(i18n.eveningDraws)
 		_ = try await thread?.send(
 			userSelection: party.filter { alive[$0]! },
-			id: "nominate",
+			id: .nominate,
 			label: i18n.nominationTitle,
-			buttons: [CommunicationButton(id: "nominate-skip", label: i18n.nominateSkip)]
+			buttons: [CommunicationButton(id: .nominateSkip, label: i18n.nominateSkip)]
 		)
 
 		try await nominationCondition.wait()
@@ -644,8 +660,8 @@ public class State<Comm: Communication> {
 			self.votes = [:]
 			_ = try await thread?.send(i18n.votingPersonTitle(who: nominee))
 			_ = try await thread?.send(
-				CommunicationButton(id: "vote-yes", label: i18n.voteYes, color: .good),
-				CommunicationButton(id: "vote-no", label: i18n.voteNo, color: .bad)
+				CommunicationButton(id: .voteYes, label: i18n.voteYes, color: .good),
+				CommunicationButton(id: .voteNo, label: i18n.voteNo, color: .bad)
 			)
 			_ = try await Task.sleep(nanoseconds: 15_000_000_000)
 			if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
@@ -750,27 +766,27 @@ public class State<Comm: Communication> {
 					_ = try await dm.send(CommunicationEmbed(title: i18n.normalWolfAction))
 					menu = Set(party.filter { alive[$0]! }.filter { $0 == user || roles[$0]?.disposition != .evil })
 				}
-				actionMessages[user] = try await dm.send(userSelection: menu, id: "werewolf-kill", label: "")
+				actionMessages[user] = try await dm.send(userSelection: menu, id: .werewolfKill, label: "")
 			case .guardianAngel:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.gaAction))
 				let possible = party.filter { alive[$0]! }
-				actionMessages[user] = try await dm.send(userSelection: possible, id: "guardianAngel-protect", label: i18n.gaPrompt)
+				actionMessages[user] = try await dm.send(userSelection: possible, id: .guardianAngelProtect, label: i18n.gaPrompt)
 			case .seer:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.seerAction))
 				let possible = party.filter { $0 != user }.filter { alive[$0]! }
-				actionMessages[user] = try await dm.send(userSelection: possible, id: "seer-investigate", label: i18n.seerPrompt)
+				actionMessages[user] = try await dm.send(userSelection: possible, id: .seerInvestigate, label: i18n.seerPrompt)
 			case .oracle:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.oracleAction))
 				let possible = party.filter { $0 != user }.filter { alive[$0]! }
-				actionMessages[user] = try await dm.send(userSelection: possible, id: "oracle-investigate", label: i18n.oraclePrompt)
+				actionMessages[user] = try await dm.send(userSelection: possible, id: .oracleInvestigate, label: i18n.oraclePrompt)
 			case .cookiePerson:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.cpAction))
 				let possible = party.filter { $0 != user }.filter { alive[$0]! }
-				actionMessages[user] = try await dm.send(userSelection: possible, id: "cookies-give", label: i18n.cpPrompt)
+				actionMessages[user] = try await dm.send(userSelection: possible, id: .cookiesGive, label: i18n.cpPrompt)
 			case .goose:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.gooseAction))
 				let possible = party.filter { $0 != user }.filter { alive[$0]! }.filter { roles[$0]?.disposition != .evil }
-				actionMessages[user] = try await dm.send(userSelection: possible, id: "goose", label: i18n.goosePrompt)
+				actionMessages[user] = try await dm.send(userSelection: possible, id: .goose, label: i18n.goosePrompt)
 			}
 		}
 	}
@@ -1198,14 +1214,14 @@ public class State<Comm: Communication> {
 		try await interaction.reply(with: CommunicationEmbed(title: "Roles", body: roles, color: .info), epheremal: true)
 	}
 
-	public let userDropdowns = [
-		"werewolf-kill": werewolfKill,
-		"guardianAngel-protect": guardianAngelProtect,
-		"seer-investigate": seerInvestigate,
-		"cookies-give": cookiesGive,
-		"nominate": nominate,
-		"goose": goose,
-		"oracle-investigate": oracleInvestigate,
+	public let singleUserDropdowns = [
+		SingleUserSelectionID.werewolfKill: werewolfKill,
+		.guardianAngelProtect: guardianAngelProtect,
+		.seerInvestigate: seerInvestigate,
+		.cookiesGive: cookiesGive,
+		.nominate: nominate,
+		.goose: goose,
+		.oracleInvestigate: oracleInvestigate,
 	]
 
 	// interaction implementations
@@ -1286,9 +1302,9 @@ public class State<Comm: Communication> {
 	}
 
 	public let buttons = [
-		"nominate-skip": nominateSkip,
-		"vote-yes": voteYes,
-		"vote-no": voteNo,
+		ButtonID.nominateSkip: nominateSkip,
+		.voteYes: voteYes,
+		.voteNo: voteNo,
 	]
 
 	// button implementations

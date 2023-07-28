@@ -353,7 +353,7 @@ public struct TokiPona: I18n {
         ]
     }
 
-    public func gooseKillMessage(who: Mentionable) -> String { "waso li alasa moli e \(who.mention()) kepeken \(English.gooseDeathItems.randomElement()!)..." }
+    public func gooseKillMessage(who: Mentionable) -> String { "waso li alasa moli e \(who.mention()) kepeken \(TokiPona.gooseDeathItems.randomElement()!)..." }
     public func werewolfKillMessage(who: Mentionable) -> String { "soweli mun li alasa moli e \(who.mention())..." }
     public func visitedWerewolf(who: Mentionable) -> String { "\(who.mention()) li tawa tomo pi soweli mun, pakala..." }
     public func visitedWerewolfEaten(who: Mentionable) -> String { "\(who.mention()) li kama moku!" }

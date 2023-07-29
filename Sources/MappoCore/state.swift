@@ -635,37 +635,58 @@ public class State<Comm: Communication> {
 		_ = try await thread?.send(i18n.villagersGather)
 		_ = try await thread?.send(i18n.itIsDaytime)
 
-		try await Task.sleep(nanoseconds: 60_000_000_000)
+		try await Task.sleep(nanoseconds: 30_000_000_000)
+
+		_ = try await thread?.send(i18n.dayTimeRunningOut)
+
+		try await Task.sleep(nanoseconds: 30_000_000_000)
 
 		resetVotes()
 		_ = try await thread?.send(i18n.eveningDraws)
 		_ = try await thread?.send(
 			multiUserSelection: party.filter { alive[$0]! },
 			id: .nominate,
-			label: i18n.nominationTitle,
-			buttons: [CommunicationButton(id: .nominateSkip, label: i18n.nominateSkip)]
+			label: i18n.nominationTitle
 		)
 
-		try await Task.sleep(nanoseconds: 30_000_000_000)
+		try await Task.sleep(nanoseconds: 15_000_000_000)
+
+		_ = try await thread?.send(
+			multiUserSelection: party.filter { alive[$0]! },
+			id: .nominate,
+			label: i18n.nominationEndingSoonTitle
+		)
+
+		try await Task.sleep(nanoseconds: 15_000_000_000)
 
 		let allVotes = votes.flatMap { $0.value }
 		let votedPlayers = Dictionary(allVotes.map { key in (key, allVotes.filter { $0 == key }.count) }, uniquingKeysWith: { a, _ in a })
 		guard let highestVote = votedPlayers.max(by: { $0.value < $1.value }) else {
-			_ = try await thread?.send("DEBUG: nobody voted")
+			_ = try await thread?.send(i18n.nobodyVoted)
 			try await nightStatus()
 			return
 		}
 		guard votedPlayers.filter({ $0.value == highestVote.value }).count == 1 else {
-			_ = try await thread?.send("DEBUG: vote was a tie")
+			_ = try await thread?.send(i18n.voteWasTie)
 			try await nightStatus()
+			try await sendVotes()
 			return
 		}
 
 		_ = try await thread?.send(i18n.exilingTitle(who: highestVote.key))
 		_ = try await attemptKill(highestVote.key, because: .exile)
+		try await sendVotes()
 		try await nightStatus()
-		// _ = try await thread?.send(i18n.timeToBed)
-		// try await Task.sleep(nanoseconds: 25_000_000_000)
+	}
+
+	func sendVotes() async throws {
+		_ = try await thread?.send(CommunicationEmbed(
+			body: votes.map { kvp in
+				let uwu = kvp.value.map { "<@\($0)>" }.joined(separator: "/")
+				return "<@\(kvp.key)>: \(uwu)"
+			}.joined(separator: "\n"),
+			color: .info
+		))
 	}
 
 	func randomize<T>(_ one: T, _ two: T) -> (T, T) {
@@ -1117,7 +1138,7 @@ public class State<Comm: Communication> {
 		guard state != .playing else {
 			try await interaction.reply(with: "A game is already in progress", epheremal: true)
 			return
-		}
+		}s
 		guard state == .assigned else {
 			try await interaction.reply(with: "You need to setup before you can start", epheremal: true)
 			return

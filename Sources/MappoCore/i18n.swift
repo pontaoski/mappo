@@ -49,11 +49,13 @@ public protocol I18n {
     var nightHasFallen: String { get }
     var villagersGather: String { get }
     var itIsDaytime: String { get }
+    var dayTimeRunningOut: String { get }
     var eveningDraws: String { get }
     var nominateSkip: String { get }
     var duskDrawsSkip: String { get }
     var duskDrawsVoting: String { get }
     var nominationTitle: String { get }
+    var nominationEndingSoonTitle: String { get }
     var voteYes: String { get }
     var voteNo: String { get }
     var timeToBed: String { get }
@@ -87,6 +89,8 @@ public protocol I18n {
     var addedLeaveQueue: String { get }
     var notInParty: String { get }
     var leftParty: String { get }
+    var nobodyVoted: String { get }
+    var voteWasTie: String { get }
 }
 
 public struct English: I18n {
@@ -146,12 +150,14 @@ public struct English: I18n {
     public let peopleLeftParty = "Some people have left the party!"
     public let nightHasFallen = "Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!"
     public let villagersGather = "The villagers gather the next morning in the village center."
-    public let itIsDaytime = "It is now day time. All of you have at least 30 seconds to make your accusations, defenses, claim roles, or just talk."
-    public let eveningDraws = "Evening draws near, and it's now possible to nominate people (or skip). We will proceed when 3/4th of villagers have decided."
+    public let itIsDaytime = "It is now day time. All of you have 60 seconds to make your accusations, defenses, claim roles, or just talk."
+    public let dayTimeRunningOut = "It is the afternoon; you have 30 seconds remaining before voting begins."
+    public let eveningDraws = "Evening draws near, and it's now possible to nominate people (or skip). We will proceed in 30 seconds."
     public let nominateSkip = "Skip Nominations"
     public let duskDrawsSkip = "The people have decided to skip voting tonight."
     public let duskDrawsVoting = "It's getting dark... let's go through the nominations!"
     public let nominationTitle = "Nominate people (or don't!)"
+    public let nominationEndingSoonTitle = "15 seconds remain!"
     public let voteYes = "Yes"
     public let voteNo = "No"
     public let timeToBed = "Dusk draws near, and it's time to get to bed... A little more discussion time (25 seconds) for you before that, though!"
@@ -185,6 +191,8 @@ public struct English: I18n {
     public let addedLeaveQueue = "You have been added to the leave queue! You will leave when the current game is over"
     public let notInParty = "You're not in the party!"
     public let leftParty = "You have left the party!"
+    public let nobodyVoted = "Nobody voted. Welp."
+    public let voteWasTie = "The vote was a tie, nobody's being exiled tonight!"
 
     public init()
     {
@@ -396,11 +404,13 @@ public struct TokiPona: I18n {
     public let nightHasFallen = "tenpo pimeja li kama. jan ale li tawa supa lape li pilin pi wawa ala. jan musi pi tenpo pimeja o, pali lon tenpo pimeja ni a!"
     public let villagersGather = "tenpo suno la, jan li kama lon tomo toki."
     public let itIsDaytime = "sina ale li jo e tenpo lili tawa ni: toki utala, toki awen, toki pi pali sina, anu toki pona."
-    public let eveningDraws = "tenpo pimeja li kama la, sina ken open weka e jan. jan mute li wile la, sina ken alasa weka e jan."
+    public let dayTimeRunningOut = "tenpo li kama lili a! tenpo kama pi weka lili la utala pi wile weka li open."
+    public let eveningDraws = "tenpo pimeja li kama la, sina ken open weka e jan. tenpo li tawa la, sina ken alasa weka e jan."
     public let nominateSkip = "alasa ala weka"
     public let duskDrawsSkip = "kulupu li wile ala alasa weka."
     public let duskDrawsVoting = "tenpo mun li kama la, mi o open alasa weka a!"
-    public let nominationTitle = "o alasa weka e jan (anu weka ala!)"
+    public let nominationTitle = "o alasa weka e jan!"
+    public let nominationEndingSoonTitle = "o alasa weka e jan! tenpo weka li kama pini!"
     public let voteYes = "wile"
     public let voteNo = "wile ala"
     public let timeToBed = "tenpo pimeja en tenpo lape li kama... taso, sina ken awen toki lon tenpo lili!"
@@ -434,6 +444,8 @@ public struct TokiPona: I18n {
     public let addedLeaveQueue = "sina kama lon tomo weka! musi ni la pini la, sina kama weka tan musi ni."
     public let notInParty = "sina lon ala kulupu!"
     public let leftParty = "sina kama weka tan kulupu!"
+    public let nobodyVoted = "wile weka li pana ala. a."
+    public let voteWasTie = "wile weka pi mute sama li lon la, mi ken ala sona e wile weka suli. jan ala li weka tan kulupu."
 
     public init()
     {

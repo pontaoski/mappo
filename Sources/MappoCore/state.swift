@@ -649,7 +649,7 @@ public class State<Comm: Communication> {
 		try await Task.sleep(nanoseconds: 30_000_000_000)
 
 		let allVotes = votes.flatMap { $0.value }
-		let votedPlayers = Dictionary(uniqueKeysWithValues: allVotes.map { key in (key, allVotes.filter { $0 == key }.count) })
+		let votedPlayers = Dictionary(allVotes.map { key in (key, allVotes.filter { $0 == key }.count) }, uniquingKeysWith: { a, _ in a })
 		guard let highestVote = votedPlayers.max(by: { $0.value < $1.value }) else {
 			_ = try await thread?.send("DEBUG: nobody voted")
 			try await nightStatus()

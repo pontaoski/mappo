@@ -1138,7 +1138,7 @@ public class State<Comm: Communication> {
 		guard state != .playing else {
 			try await interaction.reply(with: "A game is already in progress", epheremal: true)
 			return
-		}s
+		}
 		guard state == .assigned else {
 			try await interaction.reply(with: "You need to setup before you can start", epheremal: true)
 			return

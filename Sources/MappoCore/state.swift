@@ -682,8 +682,8 @@ public class State<Comm: Communication> {
 	func sendVotes() async throws {
 		_ = try await thread?.send(CommunicationEmbed(
 			body: votes.map { kvp in
-				let uwu = kvp.value.map { "<@\($0)>" }.joined(separator: "/")
-				return "<@\(kvp.key)>: \(uwu)"
+				let uwu = kvp.value.map { $0.mention() }.joined(separator: ", ")
+				return "\(kvp.key.mention()): \(uwu)"
 			}.joined(separator: "\n"),
 			color: .info
 		))

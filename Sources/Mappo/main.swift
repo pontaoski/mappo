@@ -142,6 +142,7 @@ class DiscordChannel: Sendable, I18nable {
 		let it = try await client.createMessage(
 			channelId: channelID,
 			payload: .init(
+				content: label,
 				components: [.init(components: [.stringSelect(.init(custom_id: id, options: doptions.map { (id, name) in
 					return .init(label: name, value: id.rawValue)
 				}, max_values: maxValues))]), .init(components: buttons.map(convertButton))].filter{$0.components.count > 0}

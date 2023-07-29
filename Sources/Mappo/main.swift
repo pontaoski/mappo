@@ -106,6 +106,12 @@ class DiscordChannel: Sendable, I18nable {
 		return Message(client: client, channelID: channelID, messageID: msg.id)
 	}
 	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
+		return try await sendInner(options: options, id: id.rawValue, label: label, buttons: buttons, multi: false)
+	}
+	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
+		return try await sendInner(options: options, id: id.rawValue, label: label, buttons: buttons, multi: true)
+	}
+	func sendInner(options: [UserID], id: String, label: String, buttons: [CommunicationButton], multi: Bool) async throws -> Message {
 		var doptions: [(UserID, String)] = []
 		for opt in options {
 			if
@@ -127,12 +133,18 @@ class DiscordChannel: Sendable, I18nable {
 
 			doptions.append((opt, nick))
 		}
+		let maxValues: Int?
+		if multi {
+			maxValues = doptions.count
+		} else {
+			maxValues = nil
+		}
 		let it = try await client.createMessage(
 			channelId: channelID,
 			payload: .init(
-				components: [.init(components: [.stringSelect(.init(custom_id: id.rawValue, options: doptions.map { (id, name) in
+				components: [.init(components: [.stringSelect(.init(custom_id: id, options: doptions.map { (id, name) in
 					return .init(label: name, value: id.rawValue)
-				}))]), .init(components: buttons.map(convertButton))].filter{$0.components.count > 0}
+				}, max_values: maxValues))]), .init(components: buttons.map(convertButton))].filter{$0.components.count > 0}
 			)
 		)
 		let msg = try it.decode()
@@ -288,10 +300,10 @@ class MyBot {
 			case .messageComponent(let data):
 				switch data.component_type {
 				case .stringSelect:
-					guard let value = data.values?.first else {
+					guard let values = data.values, let value = values.first else {
 						return
 					}
-					try await selectMenuEvent(id: data.custom_id, target: value, user: user, intr: intr)
+					try await selectMenuEvent(id: data.custom_id, target: value, targets: values, user: user, intr: intr)
 				case .button:
 					try await buttonClickEvent(btn: data.custom_id, user: user, intr: intr)
 				default:
@@ -326,8 +338,9 @@ class MyBot {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(cmd)). Sorry.", epheremal: true)
 		}
 	}
-	func selectMenuEvent(id: String, target: String, user: DiscordUser, intr: DiscordInteraction) async throws {
+	func selectMenuEvent(id: String, target: String, targets: [String], user: DiscordUser, intr: DiscordInteraction) async throws {
 		let target = UserSnowflake(target)
+		let targets = targets.map{UserSnowflake($0)}
 		guard let state = gs.userStates[user.id] else {
 			try await intr.reply(with: "Oops, it doesnt look like you're in a game, sorry.", epheremal: true)
 			return
@@ -336,6 +349,10 @@ class MyBot {
 		if let susID = SingleUserSelectionID.init(rawValue: id),
 			let dropdown = state.singleUserDropdowns[susID] {
 			try await dropdown(state)(user.id, target, intr)
+		} else if let musID = MultiUserSelectionID.init(rawValue: id),
+			let dropdown = state.multiUserDropdowns[musID] {
+
+			try await dropdown(state)(user.id, targets, intr)
 		} else {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(id)). Sorry.", epheremal: true)
 		}

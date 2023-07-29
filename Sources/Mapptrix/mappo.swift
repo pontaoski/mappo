@@ -63,6 +63,23 @@ class MatrixChannel: Sendable, I18nable {
 		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(html: htmlPrefix + htmlBody, plaintext: plainPrefix + plainBody))
 		return MatrixMessage(client: client, room: room, messageID: msg)
 	}
+
+	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
+		let htmlPrefix = "<h4>TODO THIS IS NOT COMPLETE\(label.replacingMentionsWithHTML)</h4>\n"
+		let plainPrefix = "\(label.replacingMentionsWithPlaintext)\n\n"
+
+		let mappedBtn = buttons.map { "\($0.label): send m!\($0.id)" }
+		let htmlBodyBtn = mappedBtn.joined(separator: "<br>")
+		let plainBodyBtn = mappedBtn.joined(separator: "\n")
+
+		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0])'>\(options[$0])</a>: send m?\(id) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
+		let plainBody = options.indices.map { "\(options[$0]): send m?\(id) \($0)" }.joined(separator: "\n") + plainBodyBtn
+
+		activeSelections[room] = options.map{$0.id}
+
+		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(html: htmlPrefix + htmlBody, plaintext: plainPrefix + plainBody))
+		return MatrixMessage(client: client, room: room, messageID: msg)
+	}
 }
 
 class MatrixMessage: Deletable, Replyable {

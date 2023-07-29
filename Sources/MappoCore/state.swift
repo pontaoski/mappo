@@ -346,6 +346,9 @@ public enum SingleUserSelectionID: String {
 	case oracleInvestigate = "oracle-investigate"
 	case cookiesGive = "cookies-give"
 	case goose = "goose"
+}
+
+public enum MultiUserSelectionID: String {
 	case nominate = "nominate"
 }
 
@@ -363,11 +366,15 @@ public protocol Sendable {
 	func send(_ embed: CommunicationEmbed) async throws -> Message
 	func send(_ buttons: [CommunicationButton]) async throws -> Message
 	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
+	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
 }
 
 public extension Sendable {
 	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String) async throws -> Message {
 		try await self.send(userSelection: options, id: id, label: label, buttons: [])
+	}
+	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String) async throws -> Message {
+		try await self.send(multiUserSelection: options, id: id, label: label, buttons: [])
 	}
 }
 
@@ -381,6 +388,9 @@ public extension Sendable {
 	}
 	func send(userSelection options: Set<UserID>, id: SingleUserSelectionID, label: String) async throws -> Message {
 		try await self.send(userSelection: Array(options), id: id, label: label)
+	}
+	func send(multiUserSelection options: Set<UserID>, id: MultiUserSelectionID, label: String) async throws -> Message {
+		try await self.send(multiUserSelection: Array(options), id: id, label: label, buttons: [])
 	}
 }
 
@@ -457,11 +467,9 @@ public class State<Comm: Communication> {
 	// who's playing?
 	var party: OrderedSet<Comm.UserID> = []
 
-	// who's ready to nominate?
-	// player -> nominate or skip
-	var readyToNominate: [Comm.UserID: Comm.UserID?] = [:]
-
-	var nominationCondition: ConditionVariable
+	// who's voted for who?
+	// player -> their votes
+	var votes: [Comm.UserID: [Comm.UserID]] = [:]
 
 	var eventLoop: EventLoop
 
@@ -473,9 +481,6 @@ public class State<Comm: Communication> {
 
 	// who's alive?
 	var alive: [Comm.UserID: Bool] = [:]
-
-	// who's voting yay/nay
-	var votes: [Comm.UserID: Bool] = [:]
 
 	var state: GameState = .waiting
 
@@ -501,15 +506,13 @@ public class State<Comm: Communication> {
 		self.day = 1
 		self.year = 1
 		self.timeOfYear = .possible.randomElement()!
-		self.nominationCondition = .init(for: eventLoop)
 		self.eventLoop = eventLoop
-		self.readyToNominate = [:]
+		self.votes = [:]
 		self.i18n = channel.i18n()
 	}
 
-	func resetNominationCondition() {
-		self.readyToNominate = [:]
-		self.nominationCondition = .init(for: self.eventLoop)
+	func resetVotes() {
+		self.votes = [:]
 	}
 
 	func clear() {
@@ -521,7 +524,6 @@ public class State<Comm: Communication> {
 		self.roles = [:]
 		self.teams = [:]
 		self.alive = [:]
-		self.readyToNominate = [:]
 		self.votes = [:]
 		self.nominatedBefore = []
 	}
@@ -633,49 +635,37 @@ public class State<Comm: Communication> {
 		_ = try await thread?.send(i18n.villagersGather)
 		_ = try await thread?.send(i18n.itIsDaytime)
 
-		try await Task.sleep(nanoseconds: 30_000_000_000)
+		try await Task.sleep(nanoseconds: 60_000_000_000)
 
-		resetNominationCondition()
+		resetVotes()
 		_ = try await thread?.send(i18n.eveningDraws)
 		_ = try await thread?.send(
-			userSelection: party.filter { alive[$0]! },
+			multiUserSelection: party.filter { alive[$0]! },
 			id: .nominate,
 			label: i18n.nominationTitle,
 			buttons: [CommunicationButton(id: .nominateSkip, label: i18n.nominateSkip)]
 		)
 
-		try await nominationCondition.wait()
-		if readyToNominate.values.filter({ $0 == nil }).count > readyToNominate.values.filter({ $0 != nil }).count {
-			_ = try await thread?.send(i18n.duskDrawsSkip)
-			try await Task.sleep(nanoseconds: 3_000_000_000)
+		try await Task.sleep(nanoseconds: 30_000_000_000)
+
+		let allVotes = votes.flatMap { $0.value }
+		let votedPlayers = Dictionary(uniqueKeysWithValues: allVotes.map { key in (key, allVotes.filter { $0 == key }.count) })
+		guard let highestVote = votedPlayers.max(by: { $0.value < $1.value }) else {
+			_ = try await thread?.send("DEBUG: nobody voted")
+			try await nightStatus()
+			return
+		}
+		guard votedPlayers.filter({ $0.value == highestVote.value }).count == 1 else {
+			_ = try await thread?.send("DEBUG: vote was a tie")
+			try await nightStatus()
 			return
 		}
 
-		_ = try await thread?.send(i18n.duskDrawsVoting)
-
-		let nominees = readyToNominate.compactMap({$0.value})
-
-		_ = try await thread?.send(i18n.votingTitle(numNominations: nominees.count))
-		for nominee in nominees {
-			self.votes = [:]
-			_ = try await thread?.send(i18n.votingPersonTitle(who: nominee))
-			_ = try await thread?.send(
-				CommunicationButton(id: .voteYes, label: i18n.voteYes, color: .good),
-				CommunicationButton(id: .voteNo, label: i18n.voteNo, color: .bad)
-			)
-			_ = try await Task.sleep(nanoseconds: 15_000_000_000)
-			if self.votes.values.filter({ $0 }).count > self.votes.values.filter({ !$0 }).count {
-				_ = try await thread?.send(i18n.exilingTitle(who: nominee))
-				_ = try await attemptKill(nominee, because: .exile)
-				try await nightStatus()
-				break
-			} else {
-				_ = try await thread?.send(i18n.notExilingTitle(who: nominee))
-			}
-		}
-
-		_ = try await thread?.send(i18n.timeToBed)
-		try await Task.sleep(nanoseconds: 25_000_000_000)
+		_ = try await thread?.send(i18n.exilingTitle(who: highestVote.key))
+		_ = try await attemptKill(highestVote.key, because: .exile)
+		try await nightStatus()
+		// _ = try await thread?.send(i18n.timeToBed)
+		// try await Task.sleep(nanoseconds: 25_000_000_000)
 	}
 
 	func randomize<T>(_ one: T, _ two: T) -> (T, T) {
@@ -1214,12 +1204,30 @@ public class State<Comm: Communication> {
 		try await interaction.reply(with: CommunicationEmbed(title: "Roles", body: roles, color: .info), epheremal: true)
 	}
 
+	public let multiUserDropdowns = [
+		MultiUserSelectionID.nominate: nominate,
+	]
+	func nominate(who: Comm.UserID, targets: [Comm.UserID], interaction: Comm.Interaction) async throws {
+		guard alive[who] == true else {
+			try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
+			return
+		}
+
+		_ = try await interaction.reply(with: "Your nominations have been recorded!", epheremal: true)
+		votes[who] = targets
+		if targets.contains(where: { roles[$0] == .innocent && !nominatedBefore.contains($0) }) && !Role.evil.contains(roles[who]!) {
+			try await attemptKill(who, because: .nominatedInnocent)
+		}
+		targets.forEach { nominatedBefore.insert($0) }
+		// _ = try await thread?.send("\(who.mention()) has nominated \(target.mention())!")
+		// checkNominationCondition()
+	}
+
 	public let singleUserDropdowns = [
 		SingleUserSelectionID.werewolfKill: werewolfKill,
 		.guardianAngelProtect: guardianAngelProtect,
 		.seerInvestigate: seerInvestigate,
 		.cookiesGive: cookiesGive,
-		.nominate: nominate,
 		.goose: goose,
 		.oracleInvestigate: oracleInvestigate,
 	]
@@ -1271,21 +1279,6 @@ public class State<Comm: Communication> {
 		try await interaction.reply(with: "You're going to give cookies to \(target.mention()) tonight!", epheremal: false)
 		actions[who] = .giveCookies(to: target)
 	}
-	func nominate(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard alive[who] == true else {
-			try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
-			return
-		}
-
-		_ = try await interaction.reply(with: "You've successfully nominated \(target.mention())", epheremal: true)
-		readyToNominate[who] = target
-		if roles[target] == .innocent && !nominatedBefore.contains(target) && !Role.evil.contains(roles[who]!) {
-			try await attemptKill(who, because: .nominatedInnocent)
-		}
-		nominatedBefore.insert(target)
-		_ = try await thread?.send("\(who.mention()) has nominated \(target.mention())!")
-		checkNominationCondition()
-	}
 	func goose(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard alive[who] == true && roles[who] == .goose else {
 			try await interaction.reply(with: "You can't goose!", epheremal: true)
@@ -1295,46 +1288,42 @@ public class State<Comm: Communication> {
 		actions[who] = .goose(who: target)
 	}
 
-	func checkNominationCondition() {
-		if readyToNominate.count >= (party.filter({alive[$0]!}).count * 2)/3 {
-			nominationCondition.release()
-		}
-	}
+	// func checkNominationCondition() {
+	// 	// if readyToNominate.count >= (party.filter({alive[$0]!}).count * 2)/3 {
+	// 	// 	nominationCondition.release()
+	// 	// }
+	// }
 
-	public let buttons = [
-		ButtonID.nominateSkip: nominateSkip,
-		.voteYes: voteYes,
-		.voteNo: voteNo,
-	]
+	public let buttons: [ButtonID: (State<Comm>) -> (Comm.UserID, Comm.Interaction) async throws -> ()] = [:]
 
-	// button implementations
-	func nominateSkip(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard alive[who] == true else {
-			try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
-			return
-		}
+	// // button implementations
+	// func nominateSkip(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+	// 	guard alive[who] == true else {
+	// 		try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
+	// 		return
+	// 	}
 
-		_ = try await interaction.reply(with: "You've voted to skip!", epheremal: true)
-		readyToNominate[who] = nil as Comm.UserID?
-		_ = try await thread?.send("\(who.mention()) has voted to skip!")
-		checkNominationCondition()
-	}
-	func voteYes(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard alive[who] == true else {
-			try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
-			return
-		}
-		votes[who] = true
-		_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
-		_ = try await thread?.send("\(who.mention()) has voted yes!")
-	}
-	func voteNo(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard alive[who] == true else {
-			try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
-			return
-		}
-		votes[who] = false
-		_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
-		_ = try await thread?.send("\(who.mention()) has voted no!")
-	}
+	// 	_ = try await interaction.reply(with: "You've voted to skip!", epheremal: true)
+	// 	readyToNominate[who] = nil as Comm.UserID?
+	// 	_ = try await thread?.send("\(who.mention()) has voted to skip!")
+	// 	checkNominationCondition()
+	// }
+	// func voteYes(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+	// 	guard alive[who] == true else {
+	// 		try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
+	// 		return
+	// 	}
+	// 	votes[who] = true
+	// 	_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
+	// 	_ = try await thread?.send("\(who.mention()) has voted yes!")
+	// }
+	// func voteNo(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+	// 	guard alive[who] == true else {
+	// 		try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
+	// 		return
+	// 	}
+	// 	votes[who] = false
+	// 	_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
+	// 	_ = try await thread?.send("\(who.mention()) has voted no!")
+	// }
 }

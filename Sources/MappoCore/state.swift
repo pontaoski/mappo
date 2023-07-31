@@ -700,18 +700,18 @@ public class State<Comm: Communication> {
 				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .village }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let (p1, p2) = randomize(player1, player2)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart(p1, p2, roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart(p1, p2, roles[player1]!)))
 			case .gossip:
 				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .werewolf }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let player3 = party.filter{$0 != user && $0 != player1 && $0 != player2}.randomElement()!
 				let (p1, p2, p3) = randomize(player1, player2, player3)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip(p1, p2, p3))) // "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip(p1, p2, p3)))
 			case .librarian:
 				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .werewolf }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let (p1, p2) = randomize(player1, player2)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart(p1, p2, roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart(p1, p2, roles[player1]!)))
 			default:
 				break
 			}
@@ -838,9 +838,9 @@ public class State<Comm: Communication> {
 		switch why {
 		case .werewolf, .goose:
 			if why == .goose {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.gooseKillMessage(who: who))) // "The Geese try to stab \(who.mention()) with \(State.gooseDeathItems.randomElement()!)..."
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.gooseKillMessage(who: who)))
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.werewolfKillMessage(who: who))) // "The Werewolves try to kill \(who.mention())..."
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.werewolfKillMessage(who: who)))
 			}
 
 			try await Task.sleep(nanoseconds: 3_000_000_000)
@@ -1079,28 +1079,28 @@ public class State<Comm: Communication> {
 	}
 	func setup(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {
-			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
 			return
 		}
 		guard state == .waiting || state == .assigned else {
-			try await interaction.reply(with: "A game is already in progress!", epheremal: false)
+			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: false)
 			return
 		}
 		guard party.count >= 4 else {
-			try await interaction.reply(with: "You need at least 4 people to start playing!", epheremal: false)
+			try await interaction.reply(with: i18n.atLeastFourPeopleNeeded, epheremal: false)
 			return
 		}
 		try await assignRoles()
-		try await interaction.reply(with: "You're all set to go! You can start playing now.", epheremal: false)
+		try await interaction.reply(with: i18n.gameHasBeenSetUp, epheremal: false)
 	}
 	func unsetup(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard state == .assigned else {
-			try await interaction.reply(with: "The lobby isn't in the right state for that", epheremal: true)
+			try await interaction.reply(with: i18n.lobbyNotInRightState, epheremal: true)
 			return
 		}
 
 		state = .waiting
-		try await interaction.reply(with: "The game has been un set up!", epheremal: false)
+		try await interaction.reply(with: i18n.gameHasBeenUnSetUp, epheremal: false)
 	}
 	func party(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		_ = try await interaction.reply(
@@ -1110,35 +1110,35 @@ public class State<Comm: Communication> {
 	}
 	func start(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {
-			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
 			return
 		}
 		guard state != .playing else {
-			try await interaction.reply(with: "A game is already in progress", epheremal: true)
+			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
 			return
 		}
 		guard state == .assigned else {
-			try await interaction.reply(with: "You need to setup before you can start", epheremal: true)
+			try await interaction.reply(with: i18n.mustSetUpBeforeStarting, epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "A game has been started!", epheremal: true)
+		try await interaction.reply(with: i18n.gameHasBeenStarted, epheremal: false)
 		try await startPlaying()
 	}
 	func promote(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {
-			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
 			return
 		}
 		guard party.contains(target) else {
-			try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
+			try await interaction.reply(with: i18n.targetNotInParty, epheremal: true)
 			return
 		}
 		party.swapAt(party.firstIndex(of: who)!, party.firstIndex(of: target)!)
-		try await interaction.reply(with: "\(target.mention()) has been promoted to party leader!", epheremal: false)
+		try await interaction.reply(with: i18n.hasBeenPromoted(target), epheremal: false)
 	}
 	func remove(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {
-			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
 			return
 		}
 		guard state == .waiting else {
@@ -1149,21 +1149,21 @@ public class State<Comm: Communication> {
 				leaveQueue.insert(target)
 				_ = try await interaction.reply(with: i18n.addedLeaveQueue, epheremal: true)
 			} else {
-				try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
+				try await interaction.reply(with: i18n.targetNotInParty, epheremal: true)
 			}
 			return
 		}
 		guard party.contains(target) else {
-			try await interaction.reply(with: "That person isn't in the party!", epheremal: true)
+			try await interaction.reply(with: i18n.targetNotInParty, epheremal: true)
 			return
 		}
 		try await comm.onLeft(target, state: self)
 		party.remove(target)
-		try await interaction.reply(with: "\(target.mention()) has been removed from the party!", epheremal: false)
+		try await interaction.reply(with: i18n.hasBeenRemoved(target), epheremal: false)
 	}
 	func language(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {
-			try await interaction.reply(with: "You must be the party leader to do that!", epheremal: true)
+			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
 			return
 		}
 		switch what {
@@ -1181,7 +1181,7 @@ public class State<Comm: Communication> {
 		guard let role = Role.allCases.filter({ role in
 			i18n.roleName(role).lowercased().contains(what.lowercased())
 		}).first else {
-			try await interaction.reply(with: "I couldn't find a role with that name!", epheremal: true)
+			try await interaction.reply(with: i18n.roleNotFound, epheremal: true)
 			return
 		}
 
@@ -1190,16 +1190,16 @@ public class State<Comm: Communication> {
 			body: i18n.roleDescription(role),
 			color: .info,
 			fields: [
-				.init(title: "Minimum Player Count", body: "\(role.minimumPlayerCount)"),
-				.init(title: "Maximum Role Count", body: "\(role.absoluteMax)"),
-				.init(title: "Team", body: i18n.teamName(role.defaultTeam)),
+				.init(title: i18n.headerMinimumPlayerCount, body: "\(role.minimumPlayerCount)"),
+				.init(title: i18n.headerMaximumRoleCount, body: "\(role.absoluteMax)"),
+				.init(title: i18n.headerTeam, body: i18n.teamName(role.defaultTeam)),
 			]
 		), epheremal: true)
 	}
 	func sendRoles(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		let roles = Role.allCases.map{ i18n.roleName($0) }.map{ "- \($0)" }.joined(separator: "\n")
 
-		try await interaction.reply(with: CommunicationEmbed(title: "Roles", body: roles, color: .info), epheremal: true)
+		try await interaction.reply(with: CommunicationEmbed(title: i18n.headerRoles, body: roles, color: .info), epheremal: true)
 	}
 
 	public let multiUserDropdowns = [
@@ -1207,18 +1207,16 @@ public class State<Comm: Communication> {
 	]
 	func nominate(who: Comm.UserID, targets: [Comm.UserID], interaction: Comm.Interaction) async throws {
 		guard alive[who] == true else {
-			try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
+			try await interaction.reply(with: i18n.mustBeAliveToVote, epheremal: true)
 			return
 		}
 
-		_ = try await interaction.reply(with: "Your nominations have been recorded!", epheremal: true)
+		_ = try await interaction.reply(with: i18n.voteHasBeenRecorded, epheremal: true)
 		votes[who] = targets
 		if targets.contains(where: { roles[$0] == .innocent && !nominatedBefore.contains($0) }) && teams[who]! != .werewolf {
 			try await attemptKill(who, because: .nominatedInnocent)
 		}
 		targets.forEach { nominatedBefore.insert($0) }
-		// _ = try await thread?.send("\(who.mention()) has nominated \(target.mention())!")
-		// checkNominationCondition()
 	}
 
 	public let singleUserDropdowns = [
@@ -1233,95 +1231,58 @@ public class State<Comm: Communication> {
 	// interaction implementations
 	func oracleInvestigate(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard roles[who] == .oracle else {
-			try await interaction.reply(with: "You aren't an oracle!", epheremal: true)
+			try await interaction.reply(with: i18n.youAreNotA(.oracle), epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to investigate \(target.mention()) tonight!", epheremal: true)
+		try await interaction.reply(with: i18n.youAreGoingToInvestigate(target), epheremal: true)
 		actions[who] = .oracleCheck(who: target)
 	}
 
 	func werewolfKill(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard roles[who] == .werewolf else {
-			try await interaction.reply(with: "You aren't a werewolf", epheremal: true)
+			try await interaction.reply(with: i18n.youAreNotA(.werewolf), epheremal: true)
 			return
 		}
 		if timeOfYear == .earlyWinter || timeOfYear == .lateWinter {
-			try await interaction.reply(with: "You're going to freeze \(target.mention()) tonight!", epheremal: false)
+			try await interaction.reply(with: i18n.youAreGoingToFreeze(target), epheremal: false)
 			actions[who] = .freeze(who: target)
 		} else {
-			try await interaction.reply(with: "You're going to kill \(target.mention()) tonight!", epheremal: false)
+			try await interaction.reply(with: i18n.youAreGoingToKill(target), epheremal: false)
 			actions[who] = .kill(who: target)
 		}
 	}
 	func guardianAngelProtect(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard roles[who] == .guardianAngel else {
-			try await interaction.reply(with: "You aren't a guardian angel", epheremal: true)
+			try await interaction.reply(with: i18n.youAreNotA(.guardianAngel), epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to protect \(target.mention()) tonight!", epheremal: false)
+		try await interaction.reply(with: i18n.youAreGoingToProtect(target), epheremal: false)
 		actions[who] = .protect(who: target)
 	}
 	func seerInvestigate(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard roles[who] == .seer else {
-			try await interaction.reply(with: "You aren't a seer", epheremal: true)
+			try await interaction.reply(with: i18n.youAreNotA(.seer), epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to investigate \(target.mention()) tonight!", epheremal: false)
+		try await interaction.reply(with: i18n.youAreGoingToInvestigate(target), epheremal: false)
 		actions[who] = .check(who: target)
 	}
 	func cookiesGive(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard roles[who] == .cookiePerson else {
-			try await interaction.reply(with: "You aren't a cookie person", epheremal: true)
+			try await interaction.reply(with: i18n.youAreNotA(.cookiePerson), epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to give cookies to \(target.mention()) tonight!", epheremal: false)
+		try await interaction.reply(with: i18n.youAreGoingToGiveCookies(to: target), epheremal: false)
 		actions[who] = .giveCookies(to: target)
 	}
 	func goose(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard alive[who] == true && roles[who] == .goose else {
-			try await interaction.reply(with: "You can't goose!", epheremal: true)
+			try await interaction.reply(with: i18n.youAreNotA(.goose), epheremal: true)
 			return
 		}
-		try await interaction.reply(with: "You're going to give goose \(target.mention()) tonight!", epheremal: false)
+		try await interaction.reply(with: i18n.youAreGoingToGoose(target), epheremal: false)
 		actions[who] = .goose(who: target)
 	}
 
-	// func checkNominationCondition() {
-	// 	// if readyToNominate.count >= (party.filter({alive[$0]!}).count * 2)/3 {
-	// 	// 	nominationCondition.release()
-	// 	// }
-	// }
-
 	public let buttons: [ButtonID: (State<Comm>) -> (Comm.UserID, Comm.Interaction) async throws -> ()] = [:]
-
-	// // button implementations
-	// func nominateSkip(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-	// 	guard alive[who] == true else {
-	// 		try await interaction.reply(with: "You aren't alive to nominate", epheremal: true)
-	// 		return
-	// 	}
-
-	// 	_ = try await interaction.reply(with: "You've voted to skip!", epheremal: true)
-	// 	readyToNominate[who] = nil as Comm.UserID?
-	// 	_ = try await thread?.send("\(who.mention()) has voted to skip!")
-	// 	checkNominationCondition()
-	// }
-	// func voteYes(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-	// 	guard alive[who] == true else {
-	// 		try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
-	// 		return
-	// 	}
-	// 	votes[who] = true
-	// 	_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
-	// 	_ = try await thread?.send("\(who.mention()) has voted yes!")
-	// }
-	// func voteNo(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-	// 	guard alive[who] == true else {
-	// 		try await interaction.reply(with: "You aren't alive to vote!", epheremal: true)
-	// 		return
-	// 	}
-	// 	votes[who] = false
-	// 	_ = try await interaction.reply(with: "Your vote has been submitted", epheremal: true)
-	// 	_ = try await thread?.send("\(who.mention()) has voted no!")
-	// }
 }

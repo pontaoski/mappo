@@ -32,6 +32,15 @@ public protocol I18n {
     func check(who: Mentionable, isNot role: Role) -> String
     func victory(_ reason: VictoryReason) -> String
     func victoryTitle(_ reason: VictoryReason) -> String
+    func youAreNotA(_ role: Role) -> String
+    func youAreGoingToInvestigate(_ user: Mentionable) -> String
+    func youAreGoingToFreeze(_ user: Mentionable) -> String
+    func youAreGoingToKill(_ user: Mentionable) -> String
+    func youAreGoingToProtect(_ user: Mentionable) -> String
+    func youAreGoingToGiveCookies(to user: Mentionable) -> String
+    func youAreGoingToGoose(_ user: Mentionable) -> String
+    func hasBeenRemoved(_ user: Mentionable) -> String
+    func hasBeenPromoted(_ user: Mentionable) -> String
 
     var partyListTitle: String { get }
     var playerStatusTitle: String { get }
@@ -90,6 +99,22 @@ public protocol I18n {
     var leftParty: String { get }
     var nobodyVoted: String { get }
     var voteWasTie: String { get }
+    var mustBePartyLeader: String { get }
+    var gameAlreadyInProgress: String { get }
+    var atLeastFourPeopleNeeded: String { get }
+    var gameHasBeenSetUp: String { get }
+    var lobbyNotInRightState: String { get }
+    var gameHasBeenUnSetUp: String { get }
+    var mustSetUpBeforeStarting: String { get }
+    var gameHasBeenStarted: String { get }
+    var targetNotInParty: String { get }
+    var headerMinimumPlayerCount: String { get }
+    var headerMaximumRoleCount: String { get }
+    var headerTeam: String { get }
+    var headerRoles: String { get }
+    var mustBeAliveToVote: String { get }
+    var voteHasBeenRecorded: String { get }
+    var roleNotFound: String { get }
 }
 
 public struct English: I18n {
@@ -135,6 +160,25 @@ public struct English: I18n {
         case .jester: return "The jester won!"
         }
     }
+    public func youAreNotA(_ role: Role) -> String {
+        "You aren't a \(roleName(role))!"
+    }
+    public func youAreGoingToInvestigate(_ user: Mentionable) -> String
+    { "You are going to investigate \(user.mention()) tonight!" }
+    public func youAreGoingToFreeze(_ user: Mentionable) -> String
+    { "You are going to freeze \(user.mention()) tonight!" }
+    public func youAreGoingToKill(_ user: Mentionable) -> String
+    { "You are going to kill \(user.mention()) tonight!" }
+    public func youAreGoingToProtect(_ user: Mentionable) -> String
+    { "You are going to protect \(user.mention()) tonight!" }
+    public func youAreGoingToGiveCookies(to user: Mentionable) -> String
+    { "You are going to give cookies to \(user.mention()) tonight!" }
+    public func youAreGoingToGoose(_ user: Mentionable) -> String
+    { "You are going to goose \(user.mention()) tonight!" }
+    public func hasBeenRemoved(_ user: Mentionable) -> String
+    { "\(user.mention()) was removed from the party." }
+    public func hasBeenPromoted(_ user: Mentionable) -> String
+    { "\(user.mention()) has been promoted to party leader!" }
     public let partyListTitle = "Your Party"
     public let playerStatusTitle = "Players"
     public let frozenByWerewolfDM = "You were frozen by the Werewolf!"
@@ -192,6 +236,22 @@ public struct English: I18n {
     public let leftParty = "You have left the party!"
     public let nobodyVoted = "Nobody voted. Welp."
     public let voteWasTie = "The vote was a tie, nobody's being exiled tonight!"
+    public let mustBePartyLeader = "You must be the party leader to do that!"
+    public let gameAlreadyInProgress = "A game is already in progress!"
+    public let atLeastFourPeopleNeeded = "You need at least 4 people to start playing!"
+    public let gameHasBeenSetUp = "You're all set to go! You can start playing now."
+    public let lobbyNotInRightState = "The lobby isn't in the right state for that"
+    public let gameHasBeenUnSetUp = "The game has been un set up!"
+    public let mustSetUpBeforeStarting = "You need to setup before you can start"
+    public let gameHasBeenStarted = "A game has been started!"
+    public let targetNotInParty = "That person isn't in the party!"
+    public let headerMinimumPlayerCount = "Minimum Player Count"
+    public let headerMaximumRoleCount = "Maximum Role Count"
+    public let headerTeam = "Team"
+    public let headerRoles = "Roles"
+    public let mustBeAliveToVote = "You aren't alive to vote!"
+    public let voteHasBeenRecorded = "Your votes have been recorded!"
+    public let roleNotFound = "I couldn't find a role with that name!"
 
     public init()
     {
@@ -378,6 +438,25 @@ public struct TokiPona: I18n {
         case .jester: return "jan nasa li weka!"
         }
     }
+    public func youAreNotA(_ role: Role) -> String {
+        "sina \(roleName(role)) ala!"
+    }
+    public func youAreGoingToInvestigate(_ user: Mentionable) -> String
+    { "\(user.mention()) la sina alasa sona." }
+    public func youAreGoingToFreeze(_ user: Mentionable) -> String
+    { "tenpo mun la sina kama lete e \(user.mention())!" }
+    public func youAreGoingToKill(_ user: Mentionable) -> String
+    { "mun la sina kama moli e \(user.mention())!" }
+    public func youAreGoingToProtect(_ user: Mentionable) -> String
+    { "sina awen e \(user.mention())!" }
+    public func youAreGoingToGiveCookies(to user: Mentionable) -> String
+    { "tenpo ni la sina pana e pan suwi tawa \(user.mention())!" }
+    public func youAreGoingToGoose(_ user: Mentionable) -> String
+    { "sina waso e \(user.mention())!" }
+    public func hasBeenRemoved(_ user: Mentionable) -> String
+    { "\(user.mention()) li weka tan kulupu pali" }
+    public func hasBeenPromoted(_ user: Mentionable) -> String
+    { "\(user.mention()) li kama lawa pi kulupu musi!" }
     public let partyListTitle = "kulupu musi"
     public let playerStatusTitle = "kulupu musi"
     public let frozenByWerewolfDM = "sina kama lete pi pali ala tan soweli mun!"
@@ -435,6 +514,22 @@ public struct TokiPona: I18n {
     public let leftParty = "sina kama weka tan kulupu!"
     public let nobodyVoted = "wile weka li pana ala. a."
     public let voteWasTie = "wile weka pi mute sama li lon la, mi ken ala sona e wile weka suli. jan ala li weka tan kulupu."
+    public let mustBePartyLeader = "sina nanpa wan lon kulupu ala la sina ken ala ni."
+    public let gameAlreadyInProgress = "ni li ken ala tan ni: musi li lon a!"
+    public let atLeastFourPeopleNeeded = "musi la sina wile e kulupu 4 anu mute."
+    public let gameHasBeenSetUp = "musi li ken open a!"
+    public let lobbyNotInRightState = "tenpo ni la kulupu li ken ala ni"
+    public let gameHasBeenUnSetUp = "ken pi open musi li weka a!"
+    public let mustSetUpBeforeStarting = "sina wile open musi la o /setup e musi"
+    public let gameHasBeenStarted = "musi li kama open!"
+    public let targetNotInParty = "ona li lon ala kulupu musi!"
+    public let headerMinimumPlayerCount = "suli open (kulupu li suli ni la ijo ni li ken lon)"
+    public let headerMaximumRoleCount = "suli pini (kulupu pi ijo ni li ken nanpa ni anu lili taso)"
+    public let headerTeam = "kulupu"
+    public let headerRoles = "ken pali"
+    public let mustBeAliveToVote = "sina moli la sina ken ala pana e wile weka sina!"
+    public let voteHasBeenRecorded = "mi sona e wile weka sina!"
+    public let roleNotFound = "mi sona ala e pali pi nimi ni!"
 
     public init()
     {

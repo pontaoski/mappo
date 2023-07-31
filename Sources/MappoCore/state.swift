@@ -652,8 +652,8 @@ public class State<Comm: Communication> {
 		}
 
 		_ = try await thread?.send(i18n.exilingTitle(who: highestVote.key))
-		_ = try await attemptKill(highestVote.key, because: .exile)
 		try await sendVotes()
+		_ = try await attemptKill(highestVote.key, because: .exile)
 		try await nightStatus()
 	}
 

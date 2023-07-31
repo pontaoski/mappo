@@ -24,11 +24,7 @@ public class ConditionVariable {
 		try await future.get()
 	}
 }
-public enum Disposition {
-	case evil
-	case neutral
-	case good
-}
+
 public enum Role: CaseIterable {
 	case villager
 	case werewolf
@@ -70,7 +66,7 @@ public enum Role: CaseIterable {
 				return false
 			}
 		}
-		if self.disposition == .evil {
+		if self.defaultTeam == .werewolf {
 			guard Role.wolves.contains(self) || roles.contains(where: { Role.wolves.contains($0) }) else {
 				return false
 			}
@@ -105,16 +101,6 @@ public enum Role: CaseIterable {
 			return 5
 		default:
 			return 0
-		}
-	}
-	var disposition: Disposition {
-		switch self {
-		case .guardianAngel, .seer, .oracle, .beholder, .pacifist:
-			return .good
-		case .villager, .jester, .cookiePerson, .furry, .innocent, .laundryperson, .gossip, .librarian:
-			return .neutral
-		case .werewolf, .cursed, .goose:
-			return .evil
 		}
 	}
 	func strength<T: Sequence>(with party: T, playerCount count: Int) -> Double where T.Element == Role {
@@ -173,19 +159,13 @@ public enum Role: CaseIterable {
 
 		let shuffle = roles.indices.shuffled()
 		let evil = max(Int(round(Float(shuffle.count) * 0.29)), 1)
-		let good = max(Int(round(Float(shuffle.count) * 0.4)), 2)
-		let specials = shuffle.prefix(evil + good)
+		let other = shuffle.count - evil
 
-		specials.prefix(evil).forEach {
-			roles[$0] = eligible(Role.evil).randomElement()!
+		shuffle.prefix(evil).forEach {
+			roles[$0] = eligible(Role.werewolves).randomElement()!
 		}
-		specials.suffix(good).forEach {
-			roles[$0] = eligible(Role.good).randomElement()!
-		}
-
-		let neutral = max(shuffle.count - (evil + good), 0)
-		shuffle.suffix(neutral).forEach {
-			roles[$0] = eligible(Role.neutral).randomElement()!
+		shuffle.suffix(other).forEach {
+			roles[$0] = eligible(Role.village).randomElement()!
 		}
 	}
 
@@ -216,10 +196,8 @@ public enum Role: CaseIterable {
 		return nil
 	}
 
-
-	static let good: [Role] = [.guardianAngel, .seer, .oracle, .beholder, .pacifist]
-	static let neutral: [Role] = [.villager, .jester, .cookiePerson, .furry, .innocent, .librarian, .gossip, .laundryperson]
-	static let evil: [Role] = [.werewolf, .cursed, .goose]
+	static let village: [Role] = Role.allCases.filter { $0.defaultTeam != .werewolf }
+	static let werewolves: [Role] = Role.allCases.filter { $0.defaultTeam == .werewolf }
 
 	static let wolves: Set<Role> = [.werewolf, .goose]
 	static let startOfGameInfoRoles: Set<Role> = [.laundryperson, .gossip, .librarian]
@@ -719,18 +697,18 @@ public class State<Comm: Communication> {
 				let seer = roles.filter { $0.value == .seer }[0]
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.beholderSeer(who: seer.key)))
 			case .laundryperson:
-				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .good || roles[$0]!.disposition == .neutral }.randomElement()!
+				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .village }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let (p1, p2) = randomize(player1, player2)
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart(p1, p2, roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
 			case .gossip:
-				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
+				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .werewolf }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let player3 = party.filter{$0 != user && $0 != player1 && $0 != player2}.randomElement()!
 				let (p1, p2, p3) = randomize(player1, player2, player3)
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip(p1, p2, p3))) // "You know that one of <@\(player1)>, <@\(player2)>, or <@\(player3)> is evil!"
 			case .librarian:
-				let player1 = party.filter{$0 != user}.filter{ roles[$0]!.disposition == .evil }.randomElement()!
+				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .werewolf }.randomElement()!
 				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
 				let (p1, p2) = randomize(player1, player2)
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart(p1, p2, roles[player1]!))) // "You know that one of <@\(player1)> or <@\(player2)> is a \(i18n.roleName(roles[player1]!))."
@@ -772,10 +750,10 @@ public class State<Comm: Communication> {
 				let menu: Set<Comm.UserID>
 				if self.timeOfYear == .earlyWinter || self.timeOfYear == .lateWinter {
 					_ = try await dm.send(CommunicationEmbed(title: i18n.winterWolfAction))
-					menu = Set(party.filter { $0 != user }.filter { alive[$0]! }.filter { roles[$0]?.disposition != .evil })
+					menu = Set(party.filter { $0 != user }.filter { alive[$0]! }.filter { teams[$0]! != .werewolf })
 				} else {
 					_ = try await dm.send(CommunicationEmbed(title: i18n.normalWolfAction))
-					menu = Set(party.filter { alive[$0]! }.filter { $0 == user || roles[$0]?.disposition != .evil })
+					menu = Set(party.filter { alive[$0]! }.filter { $0 == user || teams[$0]! != .werewolf })
 				}
 				actionMessages[user] = try await dm.send(userSelection: menu, id: .werewolfKill, label: "")
 			case .guardianAngel:
@@ -796,7 +774,7 @@ public class State<Comm: Communication> {
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .cookiesGive, label: i18n.cpPrompt)
 			case .goose:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.gooseAction))
-				let possible = party.filter { $0 != user }.filter { alive[$0]! }.filter { roles[$0]?.disposition != .evil }
+				let possible = party.filter { $0 != user }.filter { alive[$0]! }.filter { teams[$0]! != .werewolf }
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .goose, label: i18n.goosePrompt)
 			}
 		}
@@ -906,7 +884,7 @@ public class State<Comm: Communication> {
 			}
 			break
 		case .exile:
-			if roles[who]?.disposition != .evil && roles.filter({ alive[$0.key]! }).contains(where: { $0.value == .pacifist}) && Double.random(in: 0...1) > 0.5 {
+			if teams[who]! == .village && roles.filter({ alive[$0.key]! }).contains(where: { $0.value == .pacifist}) && Double.random(in: 0...1) > 0.5 {
 				_ = try await thread?.send(CommunicationEmbed(body: i18n.pacifistIntervention(who: who), color: .good))
 			} else {
 				try await kill(who, because: why)
@@ -1214,7 +1192,6 @@ public class State<Comm: Communication> {
 			fields: [
 				.init(title: "Minimum Player Count", body: "\(role.minimumPlayerCount)"),
 				.init(title: "Maximum Role Count", body: "\(role.absoluteMax)"),
-				.init(title: "Disposition", body: i18n.dispositionName(role.disposition)),
 				.init(title: "Team", body: i18n.teamName(role.defaultTeam)),
 			]
 		), epheremal: true)
@@ -1236,7 +1213,7 @@ public class State<Comm: Communication> {
 
 		_ = try await interaction.reply(with: "Your nominations have been recorded!", epheremal: true)
 		votes[who] = targets
-		if targets.contains(where: { roles[$0] == .innocent && !nominatedBefore.contains($0) }) && !Role.evil.contains(roles[who]!) {
+		if targets.contains(where: { roles[$0] == .innocent && !nominatedBefore.contains($0) }) && teams[who]! != .werewolf {
 			try await attemptKill(who, because: .nominatedInnocent)
 		}
 		targets.forEach { nominatedBefore.insert($0) }

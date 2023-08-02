@@ -968,14 +968,14 @@ public class State<Comm: Communication> {
 		let nonWerewolvesAlive = roles.filter { teams[$0.key] != .werewolf }
 			.filter { alive[$0.key] == true }
 
+		if roles[whoDied] == .jester && why == .exile {
+			return .jesterExiled
+		}
+
 		if werewolvesAlive.count == 0 {
 			return .allWerewolvesDead
 		} else if werewolvesAlive.count >= nonWerewolvesAlive.count {
 			return .werewolvesMajority
-		}
-
-		if roles[whoDied] == .jester && why == .exile {
-			return .jesterExiled
 		}
 
 		return nil

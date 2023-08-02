@@ -199,7 +199,7 @@ public enum Role: CaseIterable {
 	static let village: [Role] = Role.allCases.filter { $0.defaultTeam != .werewolf }
 	static let werewolves: [Role] = Role.allCases.filter { $0.defaultTeam == .werewolf }
 
-	static let wolves: Set<Role> = [.werewolf, .goose]
+	static let wolves: Set<Role> = [.werewolf]
 	static let startOfGameInfoRoles: Set<Role> = [.laundryperson, .gossip, .librarian]
 }
 

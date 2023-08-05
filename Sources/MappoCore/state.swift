@@ -548,7 +548,7 @@ public class State<Comm: Communication> {
 			let role = roles[user]!
 			do {
 				_ = try await dms?.send(
-					CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role))
+					CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role) + "\n\n" + i18n.strategyBlurb(for: role))
 				)
 			} catch {
 				_ = try await channel.send("I can't DM \(user.mention())! \(error)")

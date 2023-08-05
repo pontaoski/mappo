@@ -41,6 +41,7 @@ public protocol I18n {
     func youAreGoingToGoose(_ user: Mentionable) -> String
     func hasBeenRemoved(_ user: Mentionable) -> String
     func hasBeenPromoted(_ user: Mentionable) -> String
+    func strategyBlurb(for role: Role) -> String
 
     var partyListTitle: String { get }
     var playerStatusTitle: String { get }
@@ -347,6 +348,38 @@ public struct English: I18n {
             return "You're the sole person in the town's library. One of your recent patrons checked out an evil book, but you can't remember who. At the start of the game, you know that 1 of 2 players is a particular evil role."
         }
     }
+    public func strategyBlurb(for role: Role) -> String {
+        switch role {
+        case .villager:
+            return "While you may not have any abilities, your unsuspectibility is also your strength! All you can rely on are your social skills to figure out who to exile."
+        case .werewolf:
+            return "Kill people who are the biggest threat to you first, such as seers, pacifists and guardian angels. Claim a role that is as believable as possible, such as innocent, instead of roles which are easily disprovable such as seer."
+        case .guardianAngel:
+            return "Try and protect people that you know may be targeted by the werewolves, such as the seer! If you don't know who to protect, you can always protect yourself. Be careful of protecting evil werewolves, though! "
+        case .seer:
+            return "Make sure that other people don't out themselves before you out them! This will help you prove to them that you are the seer."
+        case .beholder:
+            return "As the beholder, you can pave the way for the seer! Say who they are before they out themselves and you'll establish a bond of trust between you two. But, you might lure the werewolves to them."
+        case .jester:
+            return "Being the jester is a balancing act: act suspicious enough to get exiled, but don't go overboard, or the village might suspect you of being the jester!"
+        case .cookiePerson:
+            return "Announce who you're visiting in the day, so that if you die overnight, the village knows who's responsible!"
+        case .furry:
+            return "If the werewolves claim to be you, you know who they are! But, good luck convincing everyone else that you aren't a werewolf."
+        case .innocent:
+            return "Make sure the townspeople don't try to exile you! If someone tries to exile you and doesn't die, you know that they are evil."
+        case .pacifist:
+            return "With you in the mix, the townspeople will be protected from wrongly exiling others. This lets you all be more carefree in exiling people! But not too carefree, it's not guaranteed."
+        case .goose:
+            return "If someone says that they're going to do something, you can goose them and cause chaos!"
+        case .cursed:
+            return "If you can figure out who the werewolf is whilst they're still alive, you can help lie on their behalf to make their story more believable. Don't go too hard, or you might be suspected of being evil, though!"
+        case .oracle:
+            return "Make sure that other people don't out themselves before you tell them what they're not! This will help you prove to them that you are the oracle."
+        case .laundryperson, .gossip, .librarian:
+            return "Share what you know with the group!"
+        }
+    }
     public func roleName(_ role: Role) -> String {
         switch role {
         case .villager:
@@ -623,6 +656,38 @@ public struct TokiPona: I18n {
             return "sina toki mute a! sina toki pona la, sina kama sona e ni: jan wan tan kulupu tuli li ike a!"
         case .librarian:
             return "sina pali lon tomo lipu. jan li alasa e lipu ike tan ona. sona pi nimi ona li weka tan lawa sina a... taso sina sona e jan pini tu a! wan tan tu ni li ike a!"
+        }
+    }
+    public func strategyBlurb(for role: Role) -> String {
+        switch role {
+        case .villager:
+            return "sina jo ala e pali la sina lili tawa kulupu ike. ni li wawa sina a! o kepeken e ken toki sina tawa alasa sona a!"
+        case .werewolf:
+            return "jan li ken pana sona e ike sina la o weka e ona a! sina wile e ni: jan li sona ala e powe sina. ni la, o toki ala e ni: sina jan lukin anu jan awen sewi. sina toki e ni la, jan li ken sona e ike sina."
+        case .guardianAngel:
+            return "kulupu ike li wile weka e jan pona wawa la o awen e ona! sina sona ala e jan awen la o awen e sina a! sina awen e jan ike la sina li ken kama moli a!"
+        case .seer:
+            return "jan li toki ala e pali ona la sina toki e pali ona la jan li sona e ni: sina ken kama sona e pali ona a!"
+        case .beholder:
+            return "sina sona e jan lukin a! sina toki e ni la ona li sona e ni: sina jan lukin lukin a! taso, sona ni li ken pona tawa kulupu ike kin."
+        case .jester:
+            return "pali pi jan nasa li pali meso a! sina pona lukin la jan li weka ala e sina. sina ike suli lukin la jan li sona e nasa sina. sina ike meso lukin la jan li weka e sina a!"
+        case .cookiePerson:
+            return "suno la o toki e tawa mun sina a! sina kama moli la kulupu li sona e tan moli a!"
+        case .furry:
+            return "soweli mun li wile kepeken e len sina la sina sona e ona a! taso kulupu pona li ken pilin e ni: sina soweli mun."
+        case .innocent:
+            return "kulupu pi ma tomo o weka ala e sina a! ona li weka e sina la ona li kama moli. jan li wile weka e sina li moli ala la ona li jan ike a!"
+        case .pacifist:
+            return "sina lon la weka pakala pi jan pona li ken kama pini. ni la sina ken weka kepeken sona lili a! taso, ken la pini li lon ala!"
+        case .goose:
+            return "jan li toki e pali ona la, sina ken nasa waso e pali ona!"
+        case .cursed:
+            return "sina sona e soweli mun la o toki powe o wawa e pali ona. taso sina pali ike suli la kulupu tomo li sona e ike sina li ken weka e sina a!"
+        case .oracle:
+            return "jan li toki ala e pali ona la sina toki e pali ala ona la jan li sona e ni: sina ken kama sona e pali ona a!"
+        case .laundryperson, .gossip, .librarian:
+            return "o pana e sona sina tawa kulupu a!"
         }
     }
     public func roleName(_ role: Role) -> String {

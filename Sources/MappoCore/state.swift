@@ -929,7 +929,7 @@ public class State<Comm: Communication> {
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: who, is: role), color: .bad))
 			case .oracleCheck(let who):
 				let truth = trueWho(target: who, for: action.key)
-				let possibleRoles = Set(party.filter{$0 != truth}.filter{alive[$0]!}.map{roles[$0]!}).filter{$0 != .oracle}
+				let possibleRoles = Set(party.filter{roles[$0] != roles[truth]}.filter{alive[$0]!}.map{roles[$0]!}).filter{$0 != .oracle}
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				if let role = possibleRoles.randomElement() {
 					_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: who, isNot: role), color: .bad))

@@ -39,6 +39,10 @@ public protocol I18n {
     func youAreGoingToProtect(_ user: Mentionable) -> String
     func youAreGoingToGiveCookies(to user: Mentionable) -> String
     func youAreGoingToGoose(_ user: Mentionable) -> String
+    func youAreGoingToInebriate(_ user: Mentionable) -> String
+    func bartenderRandomised(_ who: Mentionable) -> String
+    func bartenderStopped(_ who: Mentionable) -> String
+    func bartenderFailed(_ who: Mentionable) -> String
     func hasBeenRemoved(_ user: Mentionable) -> String
     func hasBeenPromoted(_ user: Mentionable) -> String
     func strategyBlurb(for role: Role) -> String
@@ -116,6 +120,9 @@ public protocol I18n {
     var mustBeAliveToVote: String { get }
     var voteHasBeenRecorded: String { get }
     var roleNotFound: String { get }
+    var bartenderAction: String { get }
+    var bartenderPrompt: String { get }
+    var inebriatedFailureDM: String { get }
 }
 
 public struct English: I18n {
@@ -180,6 +187,14 @@ public struct English: I18n {
     { "\(user.mention()) was removed from the party." }
     public func hasBeenPromoted(_ user: Mentionable) -> String
     { "\(user.mention()) has been promoted to party leader!" }
+    public func youAreGoingToInebriate(_ user: Mentionable) -> String
+    { "You're going to serve drinks to \(user.mention()) tonight!" }
+    public func bartenderRandomised(_ user: Mentionable) -> String
+    { "Your drinks distracted \(user.mention()) and made \(user.mention()) do something they didn't intend to do..." }
+    public func bartenderStopped(_ user: Mentionable) -> String
+    { "\(user.mention()) got too drunk to do anything from your drinks" }
+    public func bartenderFailed(_ user: Mentionable) -> String
+    { "Your drinks failed to do anything to \(user.mention())" }
     public let partyListTitle = "Your Party"
     public let playerStatusTitle = "Players"
     public let frozenByWerewolfDM = "You were frozen by the Werewolf!"
@@ -253,6 +268,9 @@ public struct English: I18n {
     public let mustBeAliveToVote = "You aren't alive to vote!"
     public let voteHasBeenRecorded = "Your votes have been recorded!"
     public let roleNotFound = "I couldn't find a role with that name!"
+    public let bartenderAction = "Time to visit someone's house and give them drinks!"
+    public let bartenderPrompt = "Pick someone to visit tonight."
+    public let inebriatedFailureDM = "*hic*, you couldn't do anything *hic* tonight because you were *hic* drunk"
 
     public init()
     {
@@ -346,6 +364,8 @@ public struct English: I18n {
             return "You love to gossip! With your social savvy, you realise that one of three people in your favourite gossip circle is evil!"
         case .librarian:
             return "You're the sole person in the town's library. One of your recent patrons checked out an evil book, but you can't remember who. At the start of the game, you know that 1 of 2 players is a particular evil role."
+        case .bartender:
+            return "You are the town's bartender! After hours, you can go to someone's house and give them a personal drink! Being drunk might make someone act silly, or pass out entirely. If you're out from home, and the werewolf tries to kill you, you'll survive because you weren't home. If the werewolves kill someone they're visiting, they'll kill you as well."
         }
     }
     public func strategyBlurb(for role: Role) -> String {
@@ -376,6 +396,8 @@ public struct English: I18n {
             return "If you can figure out who the werewolf is whilst they're still alive, you can help lie on their behalf to make their story more believable. Don't go too hard, or you might be suspected of being evil, though!"
         case .oracle:
             return "Make sure that other people don't out themselves before you tell them what they're not! This will help you prove to them that you are the oracle."
+        case .bartender:
+            return "You win with the village, so try and inebriate the werewolves! But, be careful not to confuse the seer."
         case .laundryperson, .gossip, .librarian:
             return "Share what you know with the group!"
         }
@@ -408,6 +430,8 @@ public struct English: I18n {
             return "Cursed"
         case .oracle:
             return "Oracle"
+        case .bartender:
+            return "Bartender"
         case .laundryperson:
             return "Laundryperson"
         case .gossip:
@@ -490,6 +514,14 @@ public struct TokiPona: I18n {
     { "\(user.mention()) li weka tan kulupu pali" }
     public func hasBeenPromoted(_ user: Mentionable) -> String
     { "\(user.mention()) li kama lawa pi kulupu musi!" }
+    public func youAreGoingToInebriate(_ user: Mentionable) -> String
+    { "sina pana e telo tawa \(user.mention())!"}
+    public func bartenderRandomised(_ user: Mentionable) -> String
+    { "telo sina li nasa e \(user.mention()) li nasa e pali ona..."}
+    public func bartenderStopped(_ user: Mentionable) -> String
+    { "telo sina li nasa e \(user.mention()) la ona li ken ala pali"}
+    public func bartenderFailed(_ user: Mentionable) -> String
+    { "telo sina li nasa ala e \(user.mention())"}
     public let partyListTitle = "kulupu musi"
     public let playerStatusTitle = "kulupu musi"
     public let frozenByWerewolfDM = "sina kama lete pi pali ala tan soweli mun!"
@@ -563,6 +595,9 @@ public struct TokiPona: I18n {
     public let mustBeAliveToVote = "sina moli la sina ken ala pana e wile weka sina!"
     public let voteHasBeenRecorded = "mi sona e wile weka sina!"
     public let roleNotFound = "mi sona ala e pali pi nimi ni!"
+    public let bartenderAction = "o tawa tomo a! sina pana e telo nasa sina tawa kulupu ona."
+    public let bartenderPrompt = "sina wile tawa e tomo seme?"
+    public let inebriatedFailureDM = "*a*, sina ken ala pali *a* lon mun tan ni: sina *a* nasa tan telo *a*"
 
     public init()
     {
@@ -656,6 +691,8 @@ public struct TokiPona: I18n {
             return "sina toki mute a! sina toki pona la, sina kama sona e ni: jan wan tan kulupu tuli li ike a!"
         case .librarian:
             return "sina pali lon tomo lipu. jan li alasa e lipu ike tan ona. sona pi nimi ona li weka tan lawa sina a... taso sina sona e jan pini tu a! wan tan tu ni li ike a!"
+        case .bartender:
+            return "sina tan pi telo nasa tawa tomo ni! tenpo pi tomo pali sina li pini la sina ken tawa tomo ante li ken pana e telo nasa tawa ona. telo nasa li ken nasa e pali ona li ken pini e pali ona. soweli li tawa tomo sina la, sina tawa jan ante la, sina moli ala! sina en soweli mun li lon tomo sama la, ona li moli kin e sina."
         }
     }
     public func strategyBlurb(for role: Role) -> String {
@@ -686,6 +723,8 @@ public struct TokiPona: I18n {
             return "sina sona e soweli mun la o toki powe o wawa e pali ona. taso sina pali ike suli la kulupu tomo li sona e ike sina li ken weka e sina a!"
         case .oracle:
             return "jan li toki ala e pali ona la sina toki e pali ala ona la jan li sona e ni: sina ken kama sona e pali ona a!"
+        case .bartender:
+            return "kulupu tomo li awen la sina awen kin. ni la o nasa e kulupu ike! taso, o nasa ala e jan lukin..."
         case .laundryperson, .gossip, .librarian:
             return "o pana e sona sina tawa kulupu a!"
         }
@@ -718,6 +757,8 @@ public struct TokiPona: I18n {
             return "jan pi kama ike"
         case .oracle:
             return "jan oko"
+        case .bartender:
+            return "jan pi telo nasa"
         case .laundryperson:
             return "jan pi telo len"
         case .gossip:

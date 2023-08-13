@@ -39,6 +39,7 @@ public enum Role: CaseIterable {
 	case goose
 	case cursed
 	case oracle
+	case bartender
 	case laundryperson
 	case gossip
 	case librarian
@@ -121,6 +122,10 @@ public enum Role: CaseIterable {
 			return 6
 		case .beholder:
 			return 2
+
+		// active roles
+		case .bartender:
+			return 4
 
 		// defensive roles
 		case .guardianAngel:
@@ -324,6 +329,7 @@ public enum SingleUserSelectionID: String {
 	case oracleInvestigate = "oracle-investigate"
 	case cookiesGive = "cookies-give"
 	case goose = "goose"
+	case bartenderInebriate = "bartender-inebriate"
 }
 
 public enum MultiUserSelectionID: String {
@@ -409,6 +415,9 @@ public class State<Comm: Communication> {
 		case oracleCheck(who: Comm.UserID)
 		case giveCookies(to: Comm.UserID)
 		case goose(who: Comm.UserID)
+		case inebriateRandom(who: Comm.UserID)
+		case inebriateFail(who: Comm.UserID)
+		case failedInebriate(who: Comm.UserID)
 
 		func isValid<T: Sequence>(doer: Comm.UserID, with actions: T) -> Bool where T.Element == Action {
 			if actions.contains(.freeze(who: doer)) {
@@ -422,7 +431,7 @@ public class State<Comm: Communication> {
 
 		var awayFromHome: Bool {
 			switch self {
-			case .kill, .giveCookies:
+			case .kill, .giveCookies, .inebriateRandom, .inebriateFail, .failedInebriate:
 				return true
 			case .freeze, .protect, .check, .goose, .oracleCheck:
 				return false
@@ -776,6 +785,10 @@ public class State<Comm: Communication> {
 				_ = try await dm.send(CommunicationEmbed(title: i18n.gooseAction))
 				let possible = party.filter { $0 != user }.filter { alive[$0]! }.filter { teams[$0]! != .werewolf }
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .goose, label: i18n.goosePrompt)
+			case .bartender:
+				_ = try await dm.send(CommunicationEmbed(title: i18n.bartenderAction))
+				let possible = party.filter{ $0 != user }.filter{ alive[$0]! }
+				actionMessages[user] = try await dm.send(userSelection: possible, id: .bartenderInebriate, label: i18n.bartenderPrompt)
 			}
 		}
 	}
@@ -903,10 +916,10 @@ public class State<Comm: Communication> {
 	}
 
 	func trueWho(target: Comm.UserID, for doer: Comm.UserID) -> Comm.UserID {
-		if !actions.values.contains(.goose(who: doer)) {
-			return target
+		if actions.values.contains(.goose(who: doer)) || actions.values.contains(.inebriateRandom(who: doer)) {
+			return party.filter { alive[$0]! }.randomElement()!
 		}
-		return party.filter { alive[$0]! }.randomElement()!
+		return target
 	}
 
 	func endNight() async throws {
@@ -919,6 +932,11 @@ public class State<Comm: Communication> {
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.frozenByWerewolfDM, color: .bad))
 				_ = try await thread?.send(CommunicationEmbed(body: i18n.frozenByWerewolfAnnouncement, color: .bad))
+				continue
+			}
+			if actions.values.contains(.inebriateFail(who: action.key)) {
+				let dm = try await comm.getChannel(for: action.key, state: self)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.inebriatedFailureDM, color: .bad))
 				continue
 			}
 			switch action.value {
@@ -954,6 +972,22 @@ public class State<Comm: Communication> {
 			case .goose(let who) where !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }):
 				let truth = trueWho(target: who, for: action.key)
 				try await attemptKill(truth, because: .goose)
+			case .inebriateRandom(let who), .inebriateFail(let who), .failedInebriate(let who):
+				let truth = trueWho(target: who, for: action.key)
+				if actions.contains(where: { $0.value == .kill(who: truth) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
+					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: truth))
+				}
+				let dm = try await comm.getChannel(for: action.key, state: self)
+				switch action.value {
+				case .inebriateRandom:
+					_ = try await dm?.send(CommunicationEmbed(body: i18n.bartenderRandomised(who), color: .info))
+				case .inebriateFail:
+					_ = try await dm?.send(CommunicationEmbed(body: i18n.bartenderStopped(who), color: .info))
+				case .failedInebriate:
+					_ = try await dm?.send(CommunicationEmbed(body: i18n.bartenderFailed(who), color: .info))
+				default:
+					()
+				}
 			case .freeze(_), .goose(_):
 				continue
 			}
@@ -1226,6 +1260,7 @@ public class State<Comm: Communication> {
 		.cookiesGive: cookiesGive,
 		.goose: goose,
 		.oracleInvestigate: oracleInvestigate,
+		.bartenderInebriate: bartenderInebriate,
 	]
 
 	// interaction implementations
@@ -1282,6 +1317,21 @@ public class State<Comm: Communication> {
 		}
 		try await interaction.reply(with: i18n.youAreGoingToGoose(target), epheremal: false)
 		actions[who] = .goose(who: target)
+	}
+	func bartenderInebriate(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard alive[who] == true && roles[who] == .bartender else {
+			try await interaction.reply(with: i18n.youAreNotA(.bartender), epheremal: true)
+			return
+		}
+		try await interaction.reply(with: i18n.youAreGoingToInebriate(target), epheremal: false)
+		let dice = Double.random(in: 0...1)
+		if dice <= 0.5 {
+			actions[who] = .inebriateRandom(who: target)
+		} else if dice <= 0.9 {
+			actions[who] = .inebriateFail(who: target)
+		} else {
+			actions[who] = .failedInebriate(who: target)
+		}
 	}
 
 	public let buttons: [ButtonID: (State<Comm>) -> (Comm.UserID, Comm.Interaction) async throws -> ()] = [:]

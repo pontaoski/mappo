@@ -88,7 +88,7 @@ public enum Role: CaseIterable {
 
 	var absoluteMax: Int {
 		switch self {
-		case .guardianAngel, .seer, .oracle, .beholder, .jester, .cookiePerson, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian:
+		case .guardianAngel, .seer, .oracle, .beholder, .jester, .cookiePerson, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian, .bartender:
 			return 1
 		case .furry:
 			return 2
@@ -125,7 +125,7 @@ public enum Role: CaseIterable {
 
 		// active roles
 		case .bartender:
-			return 4
+			return 6
 
 		// defensive roles
 		case .guardianAngel:

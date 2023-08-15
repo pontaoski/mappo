@@ -428,6 +428,30 @@ public class State<Comm: Communication> {
 			}
 			return true
 		}
+		func retarget(_ to: Comm.UserID) -> Action {
+			switch self {
+			case .check: 
+				return .check(who: to)
+			case .failedInebriate:
+				return .failedInebriate(who: to)
+			case .freeze:
+				return .freeze(who: to)
+			case .giveCookies:
+				return .giveCookies(to: to)
+			case .goose:
+				return .goose(who: to)
+			case .inebriateFail:
+				return .inebriateFail(who: to)
+			case .inebriateRandom:
+				return .inebriateRandom(who: to)
+			case .kill:
+				return .kill(who: to)
+			case .oracleCheck:
+				return .oracleCheck(who: to)
+			case .protect:
+				return .protect(who: to)
+			}
+		}
 
 		var awayFromHome: Bool {
 			switch self {
@@ -435,6 +459,18 @@ public class State<Comm: Communication> {
 				return true
 			case .freeze, .protect, .check, .goose, .oracleCheck:
 				return false
+			}
+		}
+		var priority: Int {
+			switch self {
+			case .goose:
+				return 10
+			case .inebriateRandom, .inebriateFail:
+				return 9
+			case .freeze:
+				return 8
+			default:
+				return 0
 			}
 		}
 	}
@@ -915,11 +951,38 @@ public class State<Comm: Communication> {
 		try await handlePossibleWin(whoDied: who, why: why)
 	}
 
-	func trueWho(target: Comm.UserID, for doer: Comm.UserID) -> Comm.UserID {
-		if actions.values.contains(.goose(who: doer)) || actions.values.contains(.inebriateRandom(who: doer)) {
-			return party.filter { alive[$0]! }.randomElement()!
+	func preActions() async throws {
+		let keys = actions.keys.sorted(by: { (actions[$0]?.priority ?? 0) > (actions[$1]?.priority ?? 0) })
+		for key in keys {
+			guard let action = actions[key] else {
+				continue
+			}
+
+			switch action {
+			case .freeze(let who):
+				let dm = try await comm.getChannel(for: who, state: self)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.frozenByWerewolfDM, color: .bad))
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.frozenByWerewolfAnnouncement, color: .bad))
+				actions.removeValue(forKey: who)
+			case .inebriateFail(let who):
+				let dm = try await comm.getChannel(for: who, state: self)
+				let myDM = try await comm.getChannel(for: key, state: self)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.inebriatedFailureDM, color: .bad))
+				_ = try await myDM?.send(CommunicationEmbed(body: i18n.bartenderStopped(who), color: .info))
+			case .inebriateRandom(let who):
+				let myDM = try await comm.getChannel(for: key, state: self)
+				_ = try await myDM?.send(CommunicationEmbed(body: i18n.bartenderRandomised(who), color: .info))
+				let randomTarget = party.filter { alive[$0]! }.randomElement()!
+				actions[who] = actions[who].map{ $0.retarget(randomTarget) }
+			case .failedInebriate(let who):
+				let dm = try await comm.getChannel(for: key, state: self)
+				_ = try await dm?.send(CommunicationEmbed(body: i18n.bartenderFailed(who), color: .info))
+			case .goose(let who): let randomTarget = party.filter { alive[$0]! }.randomElement()!
+				actions[who] = actions[who].map{ $0.retarget(randomTarget) }
+			default:
+				continue
+			}
 		}
-		return target
 	}
 
 	func endNight() async throws {
@@ -927,27 +990,15 @@ public class State<Comm: Communication> {
 			try await actionMessage.value.delete()
 		}
 		actionMessages = [:]
+		try await preActions()
 		for action in actions {
-			if actions.values.contains(.freeze(who: action.key)) {
-				let dm = try await comm.getChannel(for: action.key, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.frozenByWerewolfDM, color: .bad))
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.frozenByWerewolfAnnouncement, color: .bad))
-				continue
-			}
-			if actions.values.contains(.inebriateFail(who: action.key)) {
-				let dm = try await comm.getChannel(for: action.key, state: self)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.inebriatedFailureDM, color: .bad))
-				continue
-			}
 			switch action.value {
 			case .check(let who):
-				let truth = trueWho(target: who, for: action.key)
-				let role = roles[truth]!.appearsAs(to: .seer)
+				let role = roles[who]!.appearsAs(to: .seer)
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: who, is: role), color: .bad))
 			case .oracleCheck(let who):
-				let truth = trueWho(target: who, for: action.key)
-				let possibleRoles = Set(party.filter{roles[$0] != roles[truth]}.filter{alive[$0]!}.map{roles[$0]!}).filter{$0 != .oracle}
+				let possibleRoles = Set(party.filter{roles[$0] != roles[who]}.filter{alive[$0]!}.map{roles[$0]!}).filter{$0 != .oracle}
 				let dm = try await comm.getChannel(for: action.key, state: self)
 				if let role = possibleRoles.randomElement() {
 					_ = try await dm?.send(CommunicationEmbed(body: i18n.check(who: who, isNot: role), color: .bad))
@@ -955,38 +1006,22 @@ public class State<Comm: Communication> {
 					_ = try await dm?.send(CommunicationEmbed(body: "\(who.mention()) is not a something...? I shouldn't be able to reach this game state", color: .bad))
 				}
 			case .kill(let who):
-				let truth = trueWho(target: who, for: action.key)
-				try await attemptKill(truth, because: .werewolf)
+				try await attemptKill(who, because: .werewolf)
 			case .giveCookies(let who):
-				let truth = trueWho(target: who, for: action.key)
-				if roles[truth] == .werewolf {
+				if roles[who] == .werewolf {
 					try await attemptKill(action.key, because: .visitedWerewolf)
-				} else if actions.contains(where: { $0.value == .kill(who: truth) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: truth))
+				} else if actions.contains(where: { $0.value == .kill(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
+					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: who))
 				}
 			case .protect(let who):
-				let truth = trueWho(target: who, for: action.key)
-				if roles[truth] == .werewolf {
+				if roles[who] == .werewolf {
 					try await attemptKill(action.key, because: .protectedWerewolf)
 				}
 			case .goose(let who) where !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }):
-				let truth = trueWho(target: who, for: action.key)
-				try await attemptKill(truth, because: .goose)
+				try await attemptKill(who, because: .goose)
 			case .inebriateRandom(let who), .inebriateFail(let who), .failedInebriate(let who):
-				let truth = trueWho(target: who, for: action.key)
-				if actions.contains(where: { $0.value == .kill(who: truth) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: truth))
-				}
-				let dm = try await comm.getChannel(for: action.key, state: self)
-				switch action.value {
-				case .inebriateRandom:
-					_ = try await dm?.send(CommunicationEmbed(body: i18n.bartenderRandomised(who), color: .info))
-				case .inebriateFail:
-					_ = try await dm?.send(CommunicationEmbed(body: i18n.bartenderStopped(who), color: .info))
-				case .failedInebriate:
-					_ = try await dm?.send(CommunicationEmbed(body: i18n.bartenderFailed(who), color: .info))
-				default:
-					()
+				if actions.contains(where: { $0.value == .kill(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
+					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: who))
 				}
 			case .freeze(_), .goose(_):
 				continue

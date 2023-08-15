@@ -4,7 +4,7 @@
       "type": "lldb",
       "request": "launch",
       "name": "Debug Mappo",
-      "program": ".build/debug/Mappo",
+      "program": "${workspaceFolder:mappo}/.build/debug/Mappo",
       "args": [],
       "cwd": "${workspaceFolder:mappo}",
       "preLaunchTask": "swift: Build Debug Mappo"
@@ -13,10 +13,34 @@
       "type": "lldb",
       "request": "launch",
       "name": "Release Mappo",
-      "program": ".build/release/Mappo",
+      "program": "${workspaceFolder:mappo}/.build/release/Mappo",
       "args": [],
       "cwd": "${workspaceFolder:mappo}",
       "preLaunchTask": "swift: Build Release Mappo"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "sourceLanguages": [
+        "swift"
+      ],
+      "name": "Debug Mapptrix",
+      "program": "${workspaceFolder:mappo}/.build/debug/Mapptrix",
+      "args": [],
+      "cwd": "${workspaceFolder:mappo}",
+      "preLaunchTask": "swift: Build Debug Mapptrix"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "sourceLanguages": [
+        "swift"
+      ],
+      "name": "Release Mapptrix",
+      "program": "${workspaceFolder:mappo}/.build/release/Mapptrix",
+      "args": [],
+      "cwd": "${workspaceFolder:mappo}",
+      "preLaunchTask": "swift: Build Release Mapptrix"
     }
   ]
 }

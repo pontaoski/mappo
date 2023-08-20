@@ -207,9 +207,38 @@ public struct English: I18n {
     public let killAwayFromHome = "... but they were away from home!"
     public let peopleJoinedParty = "Some people have joined the party!"
     public let peopleLeftParty = "Some people have left the party!"
-    public let nightHasFallen = "Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!"
-    public let villagersGather = "The villagers gather the next morning in the village center."
-    public let itIsDaytime = "It is now day time. All of you have 60 seconds to make your accusations, defenses, claim roles, or just talk."
+    public var nightHasFallen: String {
+        [
+            "Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!",
+            "Darkness prevails as everyone retires for the day. The fatigue is palpable. Players of the night, you hold a time slot of 35 seconds to wield your actions!",
+            "The shroud of night descends. Our brave participants retreat to slumber, tired from the day's exploits. Tis time for the night players to shine, you've got 35 seconds to execute your moves!",
+            "As the veil of night drops, all are off to their chambers, exhausted from today's trials. Players thriving in midnight's ascendance, your 35-second countdown to act commences now!",
+            "The day is done and darkness is upon us. Everyone surrenders to fatigue and retreats for some rest. But for night players, you have a window of 35 seconds to demonstrate your skills!",
+            "Nightfall has arrived and all weary souls retreat to their beds. Night agents, the spotlight is yours - you have 35 brief seconds to strategize and act!",
+            "The canvas of black stretches across the sky, and restless heads hit pillows. All eyes are on you night players - you're on a 35-second ticking clock to make your move!",
+        ].randomElement()!
+    }
+    public var villagersGather: String {
+        [
+          "The next morning, the villagers convene in the town's heart.",
+          "When morning comes, the villagers assemble in the village square.",
+          "As the new day begins, the villagers gather in the center of the village.",
+          "The villagers collect in the village center with the break of dawn.",
+          "The villagers gather the next morning in the village center.",
+        ].randomElement()!
+    }
+    public var itIsDaytime: String {
+        [
+            "It is now day time. All of you have 60 seconds to make your accusations, defenses, claim roles, or just talk.",
+            "It's now daytime. You all have a minute to make any accusations, defenses, claim your roles, or just converse.",
+            "The day has begun. You each have 60 seconds to voice your accusations, establish your defenses, claim roles, or engage in conversation.",
+            "Daylight is here. There's 60 seconds for everyone to accuse, defend, declare roles, or just chat.",
+            "It's day break time. You've all got a minute for accusations, defenses, role-claims or just plain conversation.",
+            "The sun is up. A 60-second window has begun for you to make any accusations or defenses, state your roles, or simply discuss.",
+            "Now begins the day. Each one of you has a span of 60 seconds to present accusations, make defenses, declare roles, or just have casual talk.",
+            "Day has dawned. Everyone has one minute to accuse, defend, present roles, or go for a general chat."
+        ].randomElement()!
+    }
     public let dayTimeRunningOut = "It is the afternoon; you have 30 seconds remaining before voting begins."
     public let eveningDraws = "Evening draws near, and it's now possible to nominate people (or skip). We will proceed in 30 seconds."
     public let nominateSkip = "Skip Nominations"

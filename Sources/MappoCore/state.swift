@@ -609,8 +609,8 @@ public class State<Comm: Communication> {
 		let txt = party
 			.map { item -> String in
 				let role = roles[item]!
-				let alive = alive[item]! ? ":slight_smile:" : ":skull:"
-				let won = teams[item] == reason.winningTeam ? ":trophy:" : ":x:"
+				let alive = alive[item]! ? "🙂" : "💀"
+				let won = teams[item] == reason.winningTeam ? "🏆" : "❌"
 				return "\(won)\(alive) \(item.mention()) (\(i18n.wasA(role)))"
 			}
 			.joined(separator: "\n")
@@ -1061,8 +1061,8 @@ public class State<Comm: Communication> {
 		let txt = party
 			.map { item -> String in
 				let role = roles[item]!
-				let alive = alive[item]! ? ":slight_smile:" : ":skull:"
-				let won = teams[item] == reason.winningTeam ? ":trophy:" : ":x:"
+				let alive = alive[item]! ? "🙂" : "💀"
+				let won = teams[item] == reason.winningTeam ? "🏆" : "❌"
 				return "\(won)\(alive) \(item.mention()) (\(i18n.wasA(role)))"
 			}
 			.joined(separator: "\n")

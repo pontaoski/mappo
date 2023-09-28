@@ -254,6 +254,8 @@ final class MatrixMappo {
 			if let buttonID = ButtonID.init(rawValue: String(content.body.dropFirst(2))),
 				let button = state.buttons[buttonID] {
 				try await button(state)(UserID(id: event.sender!), message)
+			} else {
+				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Unknown button!", plaintext: "Unknown button!"))
 			}
 			break
 		case "m?": // user selection
@@ -276,12 +278,16 @@ final class MatrixMappo {
 			if let susID = SingleUserSelectionID.init(rawValue: String(split[0])),
 				let dropdown = state.singleUserDropdowns[susID] {
 				try await dropdown(state)(UserID(id: event.sender!), UserID(id: target), message)
+			} else {
+				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Unknown user selection!", plaintext: "Unknown user selection!"))
 			}
 			break
 		case "m.":
 			let command = String(content.body.dropFirst(2))
 			if let cmd = event.state.arglessCommands[command] {
 				try await cmd(event.state)(UserID(id: event.sender!), message)
+			} else {
+				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Unknown command!", plaintext: "Unknown command!"))
 			}
 			break
 		default:

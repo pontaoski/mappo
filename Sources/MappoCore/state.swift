@@ -323,13 +323,13 @@ public struct CommunicationButton {
 }
 
 public enum SingleUserSelectionID: String {
-	case werewolfKill = "werewolf-kill"
-	case guardianAngelProtect = "guardian-angel-protect"
-	case seerInvestigate = "seer-investigate"
-	case oracleInvestigate = "oracle-investigate"
-	case cookiesGive = "cookies-give"
+	case werewolfKill = "kill"
+	case guardianAngelProtect = "protect"
+	case seerInvestigate = "seer"
+	case oracleInvestigate = "oracle"
+	case cookiesGive = "give"
 	case goose = "goose"
-	case bartenderInebriate = "bartender-inebriate"
+	case bartenderInebriate = "bartend"
 }
 
 public enum MultiUserSelectionID: String {
@@ -337,9 +337,9 @@ public enum MultiUserSelectionID: String {
 }
 
 public enum ButtonID: String {
-	case nominateSkip = "nominate-skip"
-	case voteYes = "vote-yes"
-	case voteNo = "vote-no"
+	case nominateSkip = "skip"
+	case voteYes = "yes"
+	case voteNo = "no"
 }
 
 public protocol Sendable {

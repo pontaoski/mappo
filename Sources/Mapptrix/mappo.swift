@@ -28,7 +28,7 @@ class MatrixChannel: Sendable, I18nable {
 
 	func send(_ text: String) async throws -> Message {
 		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(
-			html: text.replacingMentionsWithHTML,
+			html: text.replacingMentionsWithHTML.replacingNewlinesWithBr,
 			plaintext: text.replacingMentionsWithPlaintext
 		))
 		return MatrixMessage(client: client, room: room, messageID: msg)
@@ -37,7 +37,7 @@ class MatrixChannel: Sendable, I18nable {
 	func send(_ embed: CommunicationEmbed) async throws -> Message {
 		let msg = try await client.sendMessage(to: room, content:
 			MatrixMessageContent(
-				html: "<h4>\(embed.title.replacingMentionsWithHTML)</h4>\n\(embed.body.replacingMentionsWithHTML)",
+				html: "<h4>\(embed.title.replacingMentionsWithHTML.replacingNewlinesWithBr)</h4>\n\(embed.body.replacingMentionsWithHTML.replacingNewlinesWithBr)",
 				plaintext: "\(embed.title.replacingMentionsWithPlaintext)\n\n\(embed.body.replacingMentionsWithPlaintext)"
 			)
 		)
@@ -55,12 +55,12 @@ class MatrixChannel: Sendable, I18nable {
 	}
 
 	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
-		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML)</h4>\n"
+		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML.replacingNewlinesWithBr)</h4>\n"
 		let plainPrefix = "\(label.replacingMentionsWithPlaintext)\n\n"
 
 		let (htmlBodyBtn, plainBodyBtn) = render(buttons: buttons)
 
-		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0].id)'>\(options[$0].id)</a>: send m?\(id) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
+		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0].id)'>\(options[$0].id)</a>: send m?\(id.rawValue) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
 		let plainBody = options.indices.map { "\(options[$0]): send m?\(id.rawValue) \($0)" }.joined(separator: "\n") + plainBodyBtn
 
 		activeSelections[room] = options.map{$0.id}
@@ -70,12 +70,12 @@ class MatrixChannel: Sendable, I18nable {
 	}
 
 	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
-		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML)</h4>\n"
+		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML.replacingNewlinesWithBr)</h4>\n"
 		let plainPrefix = "\(label.replacingMentionsWithPlaintext)\n\n"
 
 		let (htmlBodyBtn, plainBodyBtn) = render(buttons: buttons)
 
-		let explanation = ["Send m?\(id) followed by the space separated numbers for who you want to select; e.g. (m?\(id) 0 1)"]
+		let explanation = ["Send m?\(id.rawValue) followed by the space separated numbers for who you want to select; e.g. (m?\(id.rawValue) 0 1)"]
 		let htmlBody = (options.indices.map { "<a href='https://matrix.to/#/\(options[$0].id)'>\(options[$0].id)</a>: \($0)" } + explanation).joined(separator: "<br>") + htmlBodyBtn
 		let plainBody = (options.indices.map { "\(options[$0]): \($0)" } + explanation) .joined(separator: "\n") + plainBodyBtn
 
@@ -103,7 +103,7 @@ class MatrixMessage: Deletable, Replyable {
 
 	func reply(with text: String, epheremal: Bool) async throws {
 		_ = try await client.sendMessage(to: roomID, content: MatrixMessageContent(
-			html: text.replacingMentionsWithHTML,
+			html: text.replacingMentionsWithHTML.replacingNewlinesWithBr,
 			plaintext: text.replacingMentionsWithPlaintext
 		))
 	}
@@ -111,7 +111,7 @@ class MatrixMessage: Deletable, Replyable {
 	func reply(with embed: CommunicationEmbed, epheremal: Bool) async throws {
 		_ = try await client.sendMessage(to: roomID, content:
 			MatrixMessageContent(
-				html: "<h4>\(embed.title.replacingMentionsWithHTML)</h4>\n\(embed.body.replacingMentionsWithHTML)",
+				html: "<h4>\(embed.title.replacingMentionsWithHTML.replacingNewlinesWithBr)</h4>\n\(embed.body.replacingMentionsWithHTML.replacingNewlinesWithBr)",
 				plaintext: "\(embed.title.replacingMentionsWithPlaintext)\n\n\(embed.body.replacingMentionsWithPlaintext)"
 			)
 		)
@@ -176,7 +176,7 @@ var users: [String: State<MatrixCommunication>] = [:]
 // room -> selection
 var activeSelections: [String: [String]] = [:]
 
-let mentionRegularExpression = #"<@(@[a-zA-Z0-9]+:[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>"#
+let mentionRegularExpression = #"<@(@[a-zA-Z0-9.-]+:[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>"#
 
 extension String {
 	var replacingMentionsWithHTML: String {
@@ -185,6 +185,9 @@ extension String {
 			with: "<a href='https://matrix.to/#/$1'>$1</a>",
 			options: .regularExpression
 		)
+	}
+	var replacingNewlinesWithBr: String {
+		self.replacingOccurrences(of: "\n", with: "<br>")
 	}
 	var replacingMentionsWithPlaintext: String {
 		self.replacingOccurrences(

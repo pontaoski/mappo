@@ -292,7 +292,7 @@ final class MatrixMappo {
 					return
 				}
 				let allNums = [num] + otherNums
-				try await dropdown(state)(UserID(id: event.sender!), allNums.map{UserID(id: $0)}, message)
+				try await dropdown(state)(UserID(id: event.sender!), allNums.map{UserID(id: activeSelections[event.roomID!]?[$0])}, message)
 			} else {
 				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Unknown user selection!", plaintext: "Unknown user selection!"))
 			}

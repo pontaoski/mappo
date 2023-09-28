@@ -310,9 +310,9 @@ public struct English: I18n {
     }
     public func nightStatus(who: Mentionable, role: Role, alive: Bool) -> String {
         if alive {
-            return ":slight_smile: \(who.mention())"
+            return "🙂 \(who.mention())"
         } else {
-            return ":skull: \(who.mention()) (was a \(roleName(role)))" // TODO: should we show people's roles when they die?
+            return "💀 \(who.mention()) (was a \(roleName(role)))" // TODO: should we show people's roles when they die?
         }
     }
     public func beholderSeer(who: Mentionable) -> String {
@@ -637,9 +637,9 @@ public struct TokiPona: I18n {
     }
     public func nightStatus(who: Mentionable, role: Role, alive: Bool) -> String {
         if alive {
-            return ":slight_smile: \(who.mention())"
+            return "🙂 \(who.mention())"
         } else {
-            return ":skull: \(who.mention()) (li \(roleName(role)))" // TODO: should we show people's roles when they die?
+            return "💀 \(who.mention()) (li \(roleName(role)))" // TODO: should we show people's roles when they die?
         }
     }
     public func beholderSeer(who: Mentionable) -> String {

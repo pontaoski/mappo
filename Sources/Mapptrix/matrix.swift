@@ -62,7 +62,6 @@ final class DefaultSyncer: MatrixSyncer {
 	func handle(response: MatrixSyncResponse, since: String?) async throws {
 		logger.info("Received sync response")
 		for (roomID, roomData) in (response.rooms?.join ?? [:]) {
-			logger.info("Handling sync response: rooms.join: \(roomID) \(roomData)")
 			let room = try await getOrCreateRoom(id: roomID)
 			for var event in roomData.state.events {
 				event.roomID = roomID
@@ -80,7 +79,6 @@ final class DefaultSyncer: MatrixSyncer {
 			try await storage.saveRoom(room)
 		}
 		for (roomID, roomData) in (response.rooms?.invite ?? [:]) {
-			logger.info("Handling sync response: rooms.invite: \(roomID) \(roomData)")
 			let room = try await getOrCreateRoom(id: roomID)
 			for var event in roomData.inviteState.events {
 				event.roomID = roomID

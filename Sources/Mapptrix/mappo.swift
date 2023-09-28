@@ -18,6 +18,14 @@ class MatrixChannel: Sendable, I18nable {
 	func i18n() -> I18n {
 		English()
 	}
+
+	func render(buttons: [CommunicationButton]) -> (String, String) {
+		let mappedBtn = buttons.map { "\($0.label): send m!\($0.id.rawValue)" }
+		let htmlBodyBtn = mappedBtn.joined(separator: "<br>")
+		let plainBodyBtn = mappedBtn.joined(separator: "\n")
+		return (htmlBodyBtn, plainBodyBtn)
+	}
+
 	func send(_ text: String) async throws -> Message {
 		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(
 			html: text.replacingMentionsWithHTML,
@@ -40,9 +48,7 @@ class MatrixChannel: Sendable, I18nable {
 		let htmlPrefix = "<h4>Take an action</h4>\n"
 		let plainPrefix = "Take an action\n\n"
 
-		let mapped = buttons.map { "\($0.label): send m!\($0.id)" }
-		let htmlBody = mapped.joined(separator: "<br>")
-		let plainBody = mapped.joined(separator: "\n")
+		let (htmlBody, plainBody) = render(buttons: buttons)
 
 		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(html: htmlPrefix + htmlBody, plaintext: plainPrefix + plainBody))
 		return MatrixMessage(client: client, room: room, messageID: msg)
@@ -52,12 +58,10 @@ class MatrixChannel: Sendable, I18nable {
 		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML)</h4>\n"
 		let plainPrefix = "\(label.replacingMentionsWithPlaintext)\n\n"
 
-		let mappedBtn = buttons.map { "\($0.label): send m!\($0.id)" }
-		let htmlBodyBtn = mappedBtn.joined(separator: "<br>")
-		let plainBodyBtn = mappedBtn.joined(separator: "\n")
+		let (htmlBodyBtn, plainBodyBtn) = render(buttons: buttons)
 
-		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0])'>\(options[$0])</a>: send m?\(id) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
-		let plainBody = options.indices.map { "\(options[$0]): send m?\(id) \($0)" }.joined(separator: "\n") + plainBodyBtn
+		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0].id)'>\(options[$0].id)</a>: send m?\(id) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
+		let plainBody = options.indices.map { "\(options[$0]): send m?\(id.rawValue) \($0)" }.joined(separator: "\n") + plainBodyBtn
 
 		activeSelections[room] = options.map{$0.id}
 
@@ -66,15 +70,14 @@ class MatrixChannel: Sendable, I18nable {
 	}
 
 	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
-		let htmlPrefix = "<h4>TODO THIS IS NOT COMPLETE\(label.replacingMentionsWithHTML)</h4>\n"
+		let htmlPrefix = "<h4>\(label.replacingMentionsWithHTML)</h4>\n"
 		let plainPrefix = "\(label.replacingMentionsWithPlaintext)\n\n"
 
-		let mappedBtn = buttons.map { "\($0.label): send m!\($0.id)" }
-		let htmlBodyBtn = mappedBtn.joined(separator: "<br>")
-		let plainBodyBtn = mappedBtn.joined(separator: "\n")
+		let (htmlBodyBtn, plainBodyBtn) = render(buttons: buttons)
 
-		let htmlBody = options.indices.map { "<a href='https://matrix.to/#/\(options[$0])'>\(options[$0])</a>: send m?\(id) \($0)" }.joined(separator: "<br>") + htmlBodyBtn
-		let plainBody = options.indices.map { "\(options[$0]): send m?\(id) \($0)" }.joined(separator: "\n") + plainBodyBtn
+		let explanation = ["Send m?\(id) followed by the space separated numbers for who you want to select; e.g. (m?\(id) 0 1)"]
+		let htmlBody = (options.indices.map { "<a href='https://matrix.to/#/\(options[$0].id)'>\(options[$0].id)</a>: \($0)" } + explanation).joined(separator: "<br>") + htmlBodyBtn
+		let plainBody = (options.indices.map { "\(options[$0]): \($0)" } + explanation) .joined(separator: "\n") + plainBodyBtn
 
 		activeSelections[room] = options.map{$0.id}
 
@@ -262,7 +265,7 @@ final class MatrixMappo {
 			break
 		case "m?": // user selection
 			let split = content.body.dropFirst(2).split(separator: " ")
-			guard split.count == 2 else {
+			guard split.count >= 2 else {
 				return
 			}
 			guard let state = users[event.sender!] else {
@@ -280,6 +283,16 @@ final class MatrixMappo {
 			if let susID = SingleUserSelectionID.init(rawValue: String(split[0])),
 				let dropdown = state.singleUserDropdowns[susID] {
 				try await dropdown(state)(UserID(id: event.sender!), UserID(id: target), message)
+			} else if let musID = MultiUserSelectionID.init(rawValue: String(split[0])),
+				let dropdown = state.multiUserDropdowns[musID] {
+
+				let otherNums = split.dropFirst().compactMap{Int($0)}
+				guard otherNums.allSatisfy({ activeSelections[event.roomID!]?[$0] != nil }) else {
+					_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Invalid selection!", plaintext: "Invalid selection!"))
+					return
+				}
+				let allNums = [num] + otherNums
+				try await dropdown(state)(UserID(id: event.sender!), allNums.map{UserID(id: $0)}, message)
 			} else {
 				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Unknown user selection!", plaintext: "Unknown user selection!"))
 			}

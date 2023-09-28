@@ -435,12 +435,14 @@ struct MatrixSyncResponse: Codable {
 }
 
 extension HTTPClientResponse {
-	func into<T: Decodable>() async throws -> T {
+	func into<T: Decodable>(request: HTTPClientRequest) async throws -> T {
 		guard self.status.code/100 == 2 else {
 			// not a 2XX response
 			let body = try await self.body.collect(upTo: 1024 * 1024)
 			var err = try JSONDecoder().decode(MatrixError.self, from: body)
 			err.httpStatus = self.status
+			err.requestURL = request.url
+			err.requestMethod = request.method
 			throw err
 		}
 		let body = try await self.body.collect(upTo: 5 * 1024 * 1024)
@@ -456,6 +458,8 @@ struct MatrixError: LocalizedError, Decodable {
 	var localizedDescription: String {
 		"\(errorCode) (HTTP \(httpStatus.code) \(httpStatus.reasonPhrase)) - \(errorMessage)"
 	}
+	var requestURL: String = ""
+	var requestMethod: HTTPMethod = .GET
 
 	enum CodingKeys: String, CodingKey {
 		case errorCode = "errcode"
@@ -552,7 +556,7 @@ final class MatrixClient {
 				case filterID = "filter_id"
 			}
 		}
-		let response: Response = try await resp.into()
+		let response: Response = try await resp.into(request: request)
 
 		return response.filterID
 	}
@@ -575,7 +579,7 @@ final class MatrixClient {
 		components.queryItems = components.queryItems?.filter({ $0.value != nil })
 		let request = try createRequest(for: components.url!, method: .GET)
 		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(Int64(timeout) + 15), logger: self.logger)
-		return try await resp.into()
+		return try await resp.into(request: request)
 	}
 
 	struct EventSendResponse: Codable {
@@ -607,7 +611,7 @@ final class MatrixClient {
 		struct RoomCreateResponse: Codable {
 			let room_id: String
 		}
-		let response: RoomCreateResponse = try await resp.into()
+		let response: RoomCreateResponse = try await resp.into(request: request)
 
 		try await storage.saveDMRoomID(response.room_id, for: userID)
 		return response.room_id
@@ -623,7 +627,7 @@ final class MatrixClient {
 		struct RedactResponse: Codable {
 			let event_id: String
 		}
-		let _: RedactResponse = try await resp.into()
+		let _: RedactResponse = try await resp.into(request: request)
 	}
 
 	func sendMessage(
@@ -633,7 +637,7 @@ final class MatrixClient {
 		let url = buildURL(path: "rooms", roomID, "send", "m.room.message", transactionID())
 		let request = try createRequest(for: url, method: .PUT, body: content)
 		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
-		let response: EventSendResponse = try await resp.into()
+		let response: EventSendResponse = try await resp.into(request: request)
 		return response.event_id
 	}
 
@@ -643,7 +647,7 @@ final class MatrixClient {
 		let url = buildURL(path: "rooms", roomID)
 		let request = try createRequest(for: url, method: .POST)
 		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
-		let response: JoinRoomResponse = try await resp.into()
+		let response: JoinRoomResponse = try await resp.into(request: request)
 		return response.roomID
 	}
 

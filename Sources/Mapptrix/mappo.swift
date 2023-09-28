@@ -217,12 +217,12 @@ final class MatrixMappo {
 			guard let cont = event.content as? MatrixMessageContent else {
 				return
 			}
-			do {
-				Task {
+			Task {
+				do {
 					try await self.handleMessage(event: event, content: cont)
+				} catch {
+					logger.warning("Error handling message: \(error)")
 				}
-			} catch {
-				logger.warning("Error handling message: \(error)")
 			}
 		}
 		syncer.listen(to: "m.room.member") { event in

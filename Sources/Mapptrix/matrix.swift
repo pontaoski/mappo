@@ -622,7 +622,9 @@ final class MatrixClient {
 		in roomID: String
 	) async throws {
 		let url = buildURL(path: "rooms", roomID, "redact", id, transactionID())
-		let request = try createRequest(for: url, method: .PUT)
+		let request = try createRequest(for: url, method: .PUT, body: try JSONValue(object: [
+			"reason": "Deleted for game purposes"
+		]))
 		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 		struct RedactResponse: Codable {
 			let event_id: String

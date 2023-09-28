@@ -435,7 +435,7 @@ struct MatrixSyncResponse: Codable {
 }
 
 extension HTTPClientResponse {
-	func into<T: Decodable>(request: HTTPClientRequest) async throws -> T {
+	func into<T: Decodable>(request: HTTPClientRequest, function: String = #function) async throws -> T {
 		guard self.status.code/100 == 2 else {
 			// not a 2XX response
 			let body = try await self.body.collect(upTo: 1024 * 1024)
@@ -443,6 +443,7 @@ extension HTTPClientResponse {
 			err.httpStatus = self.status
 			err.requestURL = request.url
 			err.requestMethod = request.method
+			err.function = function
 			throw err
 		}
 		let body = try await self.body.collect(upTo: 5 * 1024 * 1024)
@@ -460,6 +461,7 @@ struct MatrixError: LocalizedError, Decodable {
 	}
 	var requestURL: String = ""
 	var requestMethod: HTTPMethod = .GET
+	var function: String = ""
 
 	enum CodingKeys: String, CodingKey {
 		case errorCode = "errcode"
@@ -644,7 +646,7 @@ final class MatrixClient {
 	func joinRoom(
 		_ roomID: String
 	) async throws -> String {
-		let url = buildURL(path: "rooms", roomID)
+		let url = buildURL(path: "join", roomID)
 		let request = try createRequest(for: url, method: .POST)
 		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 		let response: JoinRoomResponse = try await resp.into(request: request)

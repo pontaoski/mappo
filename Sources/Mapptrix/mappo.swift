@@ -248,7 +248,8 @@ final class MatrixMappo {
 		switch content.body.prefix(2) {
 		case "m!": // command selection
 			guard let state = users[event.sender!] else {
-				return // TODO: not in game
+				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "You are not in the game!", plaintext: "You are not in the game!"))
+				return
 			}
 			if let buttonID = ButtonID.init(rawValue: String(content.body.dropFirst(2))),
 				let button = state.buttons[buttonID] {
@@ -261,13 +262,16 @@ final class MatrixMappo {
 				return
 			}
 			guard let state = users[event.sender!] else {
-				return // TODO: not in game
+				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "You are not in the game!", plaintext: "You are not in the game!"))
+				return
 			}
 			guard let num = Int(split[1]) else {
-				return // TODO: complain about bad number
+				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Bad number!", plaintext: "Bad number!"))
+				return
 			}
 			guard let target = activeSelections[event.roomID!]?[num] else {
-				return // TODO: complain about invalid selection
+				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Invalid selection!", plaintext: "Invalid selection!"))
+				return
 			}
 			if let susID = SingleUserSelectionID.init(rawValue: String(split[0])),
 				let dropdown = state.singleUserDropdowns[susID] {

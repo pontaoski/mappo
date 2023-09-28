@@ -528,6 +528,26 @@ final class MatrixClient {
 		return url
 	}
 
+	/// implements M_LIMIT_EXCEEDED behaviour
+	func executeRequest(
+		_ request: HTTPClientRequest,
+		timeout: TimeAmount,
+		logger: Logger? = nil
+	) async throws -> HTTPClientResponse {
+		while true {
+			let resp = try await httpClient.execute(request, timeout: timeout, logger: logger)
+			guard resp.status == .tooManyRequests else {
+				return resp
+			}
+			struct RateLimitError: Codable {
+				let retry_after_ms: Int64
+			}
+			let body = try await resp.body.collect(upTo: 1024 * 1024)
+			let err = try JSONDecoder().decode(RateLimitError.self, from: body)
+			try await Task.sleep(for: Duration.milliseconds(err.retry_after_ms))
+			continue
+		}
+	}
 	func createRequest(for url: URL, method: HTTPMethod) throws -> HTTPClientRequest {
 		var request = HTTPClientRequest(url: url.absoluteString)
 		request.method = method
@@ -547,7 +567,7 @@ final class MatrixClient {
 	func createFilter(_ filter: JSONValue) async throws -> String {
 		let url = buildURL(path: "user", userID!, "filter")
 		let request = try createRequest(for: url, method: .POST, body: filter)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+		let resp = try await executeRequest(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 
 		struct Response: Decodable {
 			let filterID: String
@@ -578,7 +598,7 @@ final class MatrixClient {
 		]
 		components.queryItems = components.queryItems?.filter({ $0.value != nil })
 		let request = try createRequest(for: components.url!, method: .GET)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(Int64(timeout) + 15), logger: self.logger)
+		let resp = try await executeRequest(request.logged(to: self.logger), timeout: .seconds(Int64(timeout) + 15), logger: self.logger)
 		return try await resp.into(request: request)
 	}
 
@@ -606,7 +626,7 @@ final class MatrixClient {
 			"invite": [userID]
 		])
 		let request = try createRequest(for: url, method: .POST, body: params)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+		let resp = try await executeRequest(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 
 		struct RoomCreateResponse: Codable {
 			let room_id: String
@@ -625,7 +645,7 @@ final class MatrixClient {
 		let request = try createRequest(for: url, method: .PUT, body: try JSONValue(object: [
 			"reason": "Deleted for game purposes"
 		]))
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+		let resp = try await executeRequest(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 		struct RedactResponse: Codable {
 			let event_id: String
 		}
@@ -638,7 +658,7 @@ final class MatrixClient {
 	) async throws -> String {
 		let url = buildURL(path: "rooms", roomID, "send", "m.room.message", transactionID())
 		let request = try createRequest(for: url, method: .PUT, body: content)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+		let resp = try await executeRequest(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 		let response: EventSendResponse = try await resp.into(request: request)
 		return response.event_id
 	}
@@ -648,7 +668,7 @@ final class MatrixClient {
 	) async throws -> String {
 		let url = buildURL(path: "join", roomID)
 		let request = try createRequest(for: url, method: .POST)
-		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+		let resp = try await executeRequest(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 		let response: JoinRoomResponse = try await resp.into(request: request)
 		return response.roomID
 	}

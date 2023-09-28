@@ -218,7 +218,9 @@ final class MatrixMappo {
 				return
 			}
 			do {
-				try await self.handleMessage(event: event, content: cont)
+				Task {
+					try await self.handleMessage(event: event, content: cont)
+				}
 			} catch {
 				logger.warning("Error handling message: \(error)")
 			}

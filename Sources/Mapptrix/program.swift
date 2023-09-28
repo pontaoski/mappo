@@ -16,10 +16,10 @@ struct Main {
 		let userID = config.userID
 		let token = config.token
 		var logger = Logger(label: "com.github.pontaoski.Mappo")
-		let syncer = DefaultSyncer(userID: userID, storage: storage)
+		let syncer = DefaultSyncer(userID: userID, storage: storage, logger: logger)
 		logger.logLevel = .info
 		let client = MatrixClient(
-			homeserver: "https://matrix.tchncs.de",
+			homeserver: "https://matrix.toki.club",
 			eventLoop: evGroup,
 			syncer: syncer,
 			storage: storage,
@@ -28,7 +28,7 @@ struct Main {
 			accessToken: token
 		)
 
-		let _ = MatrixMappo(client: client, eventLoop: evGroup.next(), syncer: syncer)
+		let _ = MatrixMappo(client: client, eventLoop: evGroup.next(), syncer: syncer, logger: logger, userID: userID)
 
 		try! await client.sync()
 	}

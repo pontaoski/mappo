@@ -31,11 +31,13 @@ final class DefaultSyncer: MatrixSyncer {
 	var userID: String
 	var listeners: [String: [(MatrixEvent) async -> Void]]
 	let storage: MatrixStorage
+	let logger: Logger
 
-	init(userID: String, storage: MatrixStorage) {
+	init(userID: String, storage: MatrixStorage, logger: Logger) {
 		self.userID = userID
 		self.storage = storage
 		self.listeners = [:]
+		self.logger = logger
 	}
 
 	func broadcast(_ event: MatrixEvent) async {
@@ -58,7 +60,9 @@ final class DefaultSyncer: MatrixSyncer {
 	}
 
 	func handle(response: MatrixSyncResponse, since: String?) async throws {
+		logger.info("Received sync response")
 		for (roomID, roomData) in (response.rooms?.join ?? [:]) {
+			logger.info("Handling sync response: rooms.join: \(roomID) \(roomData)")
 			let room = try await getOrCreateRoom(id: roomID)
 			for var event in roomData.state.events {
 				event.roomID = roomID
@@ -76,6 +80,7 @@ final class DefaultSyncer: MatrixSyncer {
 			try await storage.saveRoom(room)
 		}
 		for (roomID, roomData) in (response.rooms?.invite ?? [:]) {
+			logger.info("Handling sync response: rooms.invite: \(roomID) \(roomData)")
 			let room = try await getOrCreateRoom(id: roomID)
 			for var event in roomData.inviteState.events {
 				event.roomID = roomID
@@ -85,6 +90,7 @@ final class DefaultSyncer: MatrixSyncer {
 			try await storage.saveRoom(room)
 		}
 		for (roomID, roomData) in (response.rooms?.leave ?? [:]) {
+			logger.info("Handling sync response: rooms.leave: \(roomID) \(roomData)")
 			let room = try await getOrCreateRoom(id: roomID)
 			for var event in roomData.timeline.events {
 				guard event.stateKey != nil else {
@@ -162,6 +168,17 @@ final class MatrixRoom: Codable {
 }
 
 protocol MatrixContent: Codable {
+}
+
+final class MatrixMemberContent: MatrixContent {
+	let membership: MembershipState
+	enum MembershipState: String, Codable {
+		case invite
+		case join
+		case knock
+		case leave
+		case ban
+	}
 }
 
 final class MatrixUnknownContent: MatrixContent {
@@ -327,6 +344,8 @@ struct MatrixEvent: Codable {
 			switch type {
 			case "m.room.message":
 				content = try values.decode(MatrixMessageContent.self, forKey: .content)
+			case "m.room.member":
+				content = try values.decode(MatrixMemberContent.self, forKey: .content)
 			default:
 				content = try values.decode(MatrixUnknownContent.self, forKey: .content)
 			}
@@ -365,6 +384,9 @@ struct MatrixSyncResponse: Codable {
 
 			struct InviteState: Codable {
 				let events: [MatrixEvent]
+			}
+			enum CodingKeys: String, CodingKey {
+				case inviteState = "invite_state"
 			}
 		}
 		struct Joined: Codable {
@@ -560,6 +582,13 @@ final class MatrixClient {
 		let event_id: String
 	}
 
+	struct JoinRoomResponse: Codable {
+		let roomID: String
+		enum CodingKeys: String, CodingKey {
+			case roomID = "room_id"
+		}
+	}
+
 	func getDM(
 		for userID: String
 	) async throws -> String {
@@ -606,6 +635,16 @@ final class MatrixClient {
 		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
 		let response: EventSendResponse = try await resp.into()
 		return response.event_id
+	}
+
+	func joinRoom(
+		_ roomID: String
+	) async throws -> String {
+		let url = buildURL(path: "rooms", roomID)
+		let request = try createRequest(for: url, method: .POST)
+		let resp = try await httpClient.execute(request.logged(to: self.logger), timeout: .seconds(30), logger: self.logger)
+		let response: JoinRoomResponse = try await resp.into()
+		return response.roomID
 	}
 
 	func sync() async throws -> Never {

@@ -1,6 +1,7 @@
 import MappoCore
 import NIO
 import Foundation
+import Logging
 
 class MatrixChannel: Sendable, I18nable {
 	typealias Message = MatrixMessage
@@ -207,7 +208,7 @@ final class MatrixMappo {
 	let communication: MatrixCommunication
 	let eventLoop: EventLoop
 
-	init(client: MatrixClient, eventLoop: EventLoop, syncer: DefaultSyncer) {
+	init(client: MatrixClient, eventLoop: EventLoop, syncer: DefaultSyncer, logger: Logger, userID: String) {
 		self.client = client
 		self.communication = MatrixCommunication(client: client)
 		self.eventLoop = eventLoop
@@ -219,7 +220,19 @@ final class MatrixMappo {
 			do {
 				try await self.handleMessage(event: event, content: cont)
 			} catch {
-				// TODO: error handling
+				logger.warning("Error handling message: \(error)")
+			}
+		}
+		syncer.listen(to: "m.room.member") { event in
+			guard let cont = event.content as? MatrixMemberContent, let roomID = event.roomID else {
+				return
+			}
+			do {
+				if cont.membership == .invite && event.stateKey == userID {
+					_ = try await client.joinRoom(roomID)
+				}
+			} catch {
+				logger.warning("Error handling member: \(error)")
 			}
 		}
 	}

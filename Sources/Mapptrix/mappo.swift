@@ -287,12 +287,12 @@ final class MatrixMappo {
 				let dropdown = state.multiUserDropdowns[musID] {
 
 				let otherNums = split.dropFirst().compactMap{Int($0)}
-				guard otherNums.allSatisfy({ activeSelections[event.roomID!]![$0] != nil }) else {
+				guard otherNums.allSatisfy({ activeSelections[event.roomID!]?[$0] != nil }) else {
 					_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Invalid selection!", plaintext: "Invalid selection!"))
 					return
 				}
 				let allNums = [num] + otherNums
-				try await dropdown(state)(UserID(id: event.sender!), allNums.map{UserID(id: activeSelections[event.roomID!]?[$0])}, message)
+				try await dropdown(state)(UserID(id: event.sender!), allNums.map{UserID(id: activeSelections[event.roomID!]![$0])}, message)
 			} else {
 				_ = try await client.sendMessage(to: event.roomID!, content: .init(html: "Unknown user selection!", plaintext: "Unknown user selection!"))
 			}

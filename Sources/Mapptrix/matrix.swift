@@ -251,22 +251,60 @@ final class MatrixTextMessage: MatrixMessageType {
 	}
 }
 
+enum RelationType: RawRepresentable, Codable {
+	typealias RawType = String
+
+	case thread
+	case other(String)
+
+	init?(rawValue: String) {
+		switch rawValue {
+		case "m.thread":	self = .thread
+		default:			self = .other(rawValue)
+		}
+	}
+	var rawValue: String {
+		switch self {
+		case .thread: 		return "m.thread"
+		case .other(let x):	return x
+		}
+	}
+}
+
+struct RelatesTo: Codable {
+	let relationType: RelationType
+	let eventID: String
+
+	enum CodingKeys: String, CodingKey {
+		case relationType = "rel_type"
+		case eventID = "event_id"
+	}
+}
+
 final class MatrixMessageContent: MatrixContent {
 	let messageType: MatrixMessageType
 	let body: String
+	let relatesTo: RelatesTo?
 
-	init(body: String, _ content: MatrixMessageType = MatrixTextMessage()) {
+	init(body: String, _ content: MatrixMessageType = MatrixTextMessage(), relatesTo: RelatesTo? = nil) {
 		self.messageType = content
 		self.body = body
+		self.relatesTo = relatesTo
 	}
-	init(html: String, plaintext: String) {
+	init(html: String, plaintext: String, relatesTo: RelatesTo? = nil) {
 		self.messageType = MatrixTextMessage(format: "org.matrix.custom.html", body: html)
 		self.body = plaintext
+		self.relatesTo = relatesTo
 	}
 	init(from decoder: Decoder) throws {
 		let values = try decoder.container(keyedBy: CodingKeys.self)
 		self.body = try values.decode(String.self, forKey: .body)
 		let messageType = try values.decode(String.self, forKey: .messageType)
+		if values.contains(.relatesTo) {
+			self.relatesTo = try values.decode(RelatesTo.self, forKey: .relatesTo)
+		} else {
+			self.relatesTo = nil
+		}
 		switch messageType {
 		case MatrixTextMessage.messageType:
 			self.messageType = try MatrixTextMessage(from: decoder)
@@ -278,12 +316,16 @@ final class MatrixMessageContent: MatrixContent {
 		var values = encoder.container(keyedBy: CodingKeys.self)
 		try values.encode(messageType.messageType, forKey: .messageType)
 		try values.encode(self.body, forKey: .body)
+		if let relatesTo = self.relatesTo {
+			try values.encode(relatesTo, forKey: .relatesTo)
+		}
 		try messageType.encode(to: encoder)
 	}
 
 	enum CodingKeys: String, CodingKey {
 		case messageType = "msgtype"
 		case body
+		case relatesTo = "m.relates_to"
 	}
 }
 

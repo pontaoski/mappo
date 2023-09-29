@@ -9,10 +9,24 @@ class MatrixChannel: Sendable, I18nable {
 
 	let client: MatrixClient
 	let room: String
+	let thread: String?
+	var relatesTo: RelatesTo? {
+		thread.map({
+			.init(
+				relationType: .thread,
+				eventID: $0
+			)
+		})
+	}
 
-	init(client: MatrixClient, room: String) {
+	init(client: MatrixClient, room: String, thread: String?) {
 		self.client = client
 		self.room = room
+		self.thread = thread
+	}
+
+	func withThread(thread: String) -> MatrixChannel {
+		return .init(client: self.client, room: self.room, thread: thread)
 	}
 
 	func i18n() -> I18n {
@@ -29,19 +43,21 @@ class MatrixChannel: Sendable, I18nable {
 	func send(_ text: String) async throws -> Message {
 		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(
 			html: text.replacingMentionsWithHTML.replacingNewlinesWithBr,
-			plaintext: text.replacingMentionsWithPlaintext
+			plaintext: text.replacingMentionsWithPlaintext,
+			relatesTo: relatesTo
 		))
-		return MatrixMessage(client: client, room: room, messageID: msg)
+		return MatrixMessage(client: client, room: room, messageID: msg, threadID: thread)
 	}
 
 	func send(_ embed: CommunicationEmbed) async throws -> Message {
 		let msg = try await client.sendMessage(to: room, content:
 			MatrixMessageContent(
 				html: "<h4>\(embed.title.replacingMentionsWithHTML.replacingNewlinesWithBr)</h4>\n\(embed.body.replacingMentionsWithHTML.replacingNewlinesWithBr)",
-				plaintext: "\(embed.title.replacingMentionsWithPlaintext)\n\n\(embed.body.replacingMentionsWithPlaintext)"
+				plaintext: "\(embed.title.replacingMentionsWithPlaintext)\n\n\(embed.body.replacingMentionsWithPlaintext)",
+				relatesTo: relatesTo
 			)
 		)
-		return MatrixMessage(client: client, room: room, messageID: msg)
+		return MatrixMessage(client: client, room: room, messageID: msg, threadID: thread)
 	}
 
 	func send(_ buttons: [CommunicationButton]) async throws -> Message {
@@ -50,8 +66,14 @@ class MatrixChannel: Sendable, I18nable {
 
 		let (htmlBody, plainBody) = render(buttons: buttons)
 
-		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(html: htmlPrefix + htmlBody, plaintext: plainPrefix + plainBody))
-		return MatrixMessage(client: client, room: room, messageID: msg)
+		let msg = try await client.sendMessage(to: room, content:
+			MatrixMessageContent(
+				html: htmlPrefix + htmlBody,
+				plaintext: plainPrefix + plainBody,
+				relatesTo: relatesTo
+			)
+		)
+		return MatrixMessage(client: client, room: room, messageID: msg, threadID: thread)
 	}
 
 	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
@@ -65,8 +87,14 @@ class MatrixChannel: Sendable, I18nable {
 
 		activeSelections[room] = options.map{$0.id}
 
-		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(html: htmlPrefix + htmlBody, plaintext: plainPrefix + plainBody))
-		return MatrixMessage(client: client, room: room, messageID: msg)
+		let msg = try await client.sendMessage(to: room, content:
+			MatrixMessageContent(
+				html: htmlPrefix + htmlBody,
+				plaintext: plainPrefix + plainBody,
+				relatesTo: relatesTo
+			)
+		)
+		return MatrixMessage(client: client, room: room, messageID: msg, threadID: thread)
 	}
 
 	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
@@ -81,20 +109,28 @@ class MatrixChannel: Sendable, I18nable {
 
 		activeSelections[room] = options.map{$0.id}
 
-		let msg = try await client.sendMessage(to: room, content: MatrixMessageContent(html: htmlPrefix + htmlBody, plaintext: plainPrefix + plainBody))
-		return MatrixMessage(client: client, room: room, messageID: msg)
+		let msg = try await client.sendMessage(to: room, content:
+			MatrixMessageContent(
+				html: htmlPrefix + htmlBody,
+				plaintext: plainPrefix + plainBody,
+				relatesTo: relatesTo
+			)
+		)
+		return MatrixMessage(client: client, room: room, messageID: msg, threadID: thread)
 	}
 }
 
 class MatrixMessage: Deletable, Replyable {
 	let roomID: String
+	let threadID: String?
 	let messageID: String
 	let client: MatrixClient
 
-	init(client: MatrixClient, room: String, messageID: String) {
+	init(client: MatrixClient, room: String, messageID: String, threadID: String?) {
 		self.roomID = room
 		self.messageID = messageID
 		self.client = client
+		self.threadID = threadID
 	}
 
 	func delete() async throws {
@@ -104,7 +140,13 @@ class MatrixMessage: Deletable, Replyable {
 	func reply(with text: String, epheremal: Bool) async throws {
 		_ = try await client.sendMessage(to: roomID, content: MatrixMessageContent(
 			html: text.replacingMentionsWithHTML.replacingNewlinesWithBr,
-			plaintext: text.replacingMentionsWithPlaintext
+			plaintext: text.replacingMentionsWithPlaintext,
+			relatesTo: threadID.map({
+				.init(
+					relationType: .thread,
+					eventID: $0
+				)
+			})
 		))
 	}
 
@@ -139,11 +181,12 @@ final class MatrixCommunication: Communication {
 
 	func getChannel(for userID: UserID, state: State<MatrixCommunication>) async throws -> Channel? {
 		let dmID = try await client.getDM(for: userID.id)
-		return MatrixChannel(client: client, room: dmID)
+		return MatrixChannel(client: client, room: dmID, thread: nil)
 	}
 
 	func createGameThread(state: State<MatrixCommunication>) async throws -> Channel? {
-		return state.channel
+		let message = try await state.channel.send("Mappo Game Thread")
+		return state.channel.withThread(thread: message.messageID)
 	}
 
 	func archive(_: Channel, state: State<MatrixCommunication>) async throws {
@@ -201,7 +244,7 @@ extension String {
 extension MatrixEvent {
 	func ensureState(client: MatrixClient, communication: MatrixCommunication, eventLoop: EventLoop) {
 		if !states.keys.contains(self.roomID!) {
-			states[self.roomID!] = State<MatrixCommunication>(for: MatrixChannel(client: client, room: self.roomID!), in: communication, eventLoop: eventLoop)
+			states[self.roomID!] = State<MatrixCommunication>(for: MatrixChannel(client: client, room: self.roomID!, thread: nil), in: communication, eventLoop: eventLoop)
 		}
 	}
 	var state: State<MatrixCommunication> {
@@ -251,7 +294,12 @@ final class MatrixMappo {
 		}
 		event.ensureState(client: client, communication: self.communication, eventLoop: self.eventLoop)
 
-		let message = MatrixMessage(client: client, room: event.roomID!, messageID: event.eventID!)
+		let message = MatrixMessage(client: client, room: event.roomID!, messageID: event.eventID!, threadID: content.relatesTo.flatMap({
+			if $0.relationType == .thread {
+				return $0.eventID
+			}
+			return nil
+		}))
 
 		switch content.body.prefix(2) {
 		case "m!": // command selection

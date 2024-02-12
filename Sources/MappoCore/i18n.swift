@@ -1,5 +1,68 @@
+public enum ClueMessage {
+    case libraryIsEvil(_ player1: Mentionable, _ player2: Mentionable)
+    case librarySeerOrBeholder(_ player1: Mentionable, _ player2: Mentionable)
+    case libraryCookiePerson(_ player1: Mentionable, _ player2: Mentionable)
+
+    case barIsEvil(_ player1: Mentionable, _ player2: Mentionable, _ player3: Mentionable)
+    case barGuardianAngelOrInnocent(_ player1: Mentionable)
+    case barVillager(_ player1: Mentionable, _ player2: Mentionable)
+
+    case warehouseIsEvil(_ player1: Mentionable, _ player2: Mentionable)
+    case warehouseJester(_ player1: Mentionable, _ player2: Mentionable)
+    case warehouseOracle(_ player1: Mentionable, _ player2: Mentionable)
+
+    case villageCenterIsEvil(_ player1: Mentionable, _ player2: Mentionable, _ player3: Mentionable)
+    case villageCenterPacifist(_ player1: Mentionable, _ player2: Mentionable)
+    case villageCenterFurry(_ player1: Mentionable, _ player2: Mentionable, _ player3: Mentionable)
+    case villageCenterInnocent(_ player1: Mentionable, _ player2: Mentionable)
+    case villageCenterBeholder(_ player1: Mentionable, _ player2: Mentionable)
+    case villageCenterJester(_ player1: Mentionable, _ player2: Mentionable)
+    case villageCenterCookiePerson(_ player1: Mentionable, _ player2: Mentionable)
+
+    var tag: Tag {
+        switch self {
+        case .libraryIsEvil: .libraryIsEvil
+        case .librarySeerOrBeholder: .librarySeerOrBeholder
+        case .libraryCookiePerson: .libraryCookiePerson
+        case .barIsEvil: .barIsEvil
+        case .barGuardianAngelOrInnocent: .barGuardianAngelOrInnocent
+        case .barVillager: .barVillager
+        case .warehouseIsEvil: .warehouseIsEvil
+        case .warehouseJester: .warehouseJester
+        case .warehouseOracle: .warehouseOracle
+        case .villageCenterIsEvil: .villageCenterIsEvil
+        case .villageCenterPacifist: .villageCenterPacifist
+        case .villageCenterFurry: .villageCenterFurry
+        case .villageCenterInnocent: .villageCenterInnocent
+        case .villageCenterBeholder: .villageCenterBeholder
+        case .villageCenterJester: .villageCenterJester
+        case .villageCenterCookiePerson: .villageCenterCookiePerson
+        }
+    }
+
+    public enum Tag: Equatable {
+        case libraryIsEvil
+        case librarySeerOrBeholder
+        case libraryCookiePerson
+        case barIsEvil
+        case barGuardianAngelOrInnocent
+        case barVillager
+        case warehouseIsEvil
+        case warehouseJester
+        case warehouseOracle
+        case villageCenterIsEvil
+        case villageCenterPacifist
+        case villageCenterFurry
+        case villageCenterInnocent
+        case villageCenterBeholder
+        case villageCenterJester
+        case villageCenterCookiePerson
+    }
+}
+
 public protocol I18n {
     func roleName(_ role: Role) -> String
+    func roleSummary(_ role: Role) -> String
     func teamName(_ team: Team) -> String
     func roleDescription(_ role: Role) -> String
     func timeOfYear(_ toy: TimeOfYear) -> String
@@ -34,6 +97,8 @@ public protocol I18n {
     func victoryTitle(_ reason: VictoryReason) -> String
     func youAreNotA(_ role: Role) -> String
     func youAreGoingToInvestigate(_ user: Mentionable) -> String
+    func locationName(_ location: DetectiveLocations) -> String
+    func youAreGoingToInvestigate(_ location: DetectiveLocations) -> String
     func youAreGoingToFreeze(_ user: Mentionable) -> String
     func youAreGoingToKill(_ user: Mentionable) -> String
     func youAreGoingToProtect(_ user: Mentionable) -> String
@@ -46,6 +111,7 @@ public protocol I18n {
     func hasBeenRemoved(_ user: Mentionable) -> String
     func hasBeenPromoted(_ user: Mentionable) -> String
     func strategyBlurb(for role: Role) -> String
+    func clue(_ clue: ClueMessage) -> String
 
     var partyListTitle: String { get }
     var playerStatusTitle: String { get }
@@ -74,6 +140,7 @@ public protocol I18n {
     var timeToBed: String { get }
     var jesterReminder: String { get }
     var aliveTitle: String { get }
+    // action titles
     var winterWolfAction: String { get }
     var normalWolfAction: String { get }
     var gaAction: String { get }
@@ -81,11 +148,16 @@ public protocol I18n {
     var oracleAction: String { get }
     var cpAction: String { get }
     var gooseAction: String { get }
+    var detectiveAction: String { get }
+    // action prompts
     var gaPrompt: String { get }
     var seerPrompt: String { get }
     var oraclePrompt: String { get }
     var cpPrompt: String { get }
     var goosePrompt: String { get } 
+    var detectivePrompt: String { get }
+    var detectiveNothingHere: String { get }
+    var detectiveCouldntInvestigate: String { get }
     var drWerewolf: String { get }
     var drExile: String { get }
     var drVisit: String { get }
@@ -151,9 +223,9 @@ public struct English: I18n {
     public func pacifistIntervention(who: Mentionable) -> String { "The pacifist snuck \(who.mention()) away from the executioner's hands! They get to live another day." }
     public func nominatedInnocent(who: Mentionable) -> String { "\(who.mention()) drew the ire of the heavens by nominating their favourite Innocent, and collapses dead due to its intervention! Oops." }
     public func protectedWerewolf(who: Mentionable) -> String { "\(who.mention()) used angelic magic to protect a werewolf. Unfortunately, the werewolf's evil magic killed \(who.mention()) when the two magics collided! Oops." }
-    public func wasA(_ role: Role) -> String { "was a \(roleName(role))" }
-    public func check(who: Mentionable, is role: Role) -> String { "\(who.mention()) is a \(roleName(role))!" }
-    public func check(who: Mentionable, isNot role: Role) -> String { "\(who.mention()) is not a \(roleName(role))!" }
+    public func wasA(_ role: Role) -> String { "was a \(role.emoji) \(roleName(role))" }
+    public func check(who: Mentionable, is role: Role) -> String { "\(who.mention()) is a \(role.emoji) \(roleName(role))!" }
+    public func check(who: Mentionable, isNot role: Role) -> String { "\(who.mention()) is not a \(role.emoji) \(roleName(role))!" }
     public func victory(_ reason: VictoryReason) -> String {
         switch reason {
         case .allWerewolvesDead: return "All the werewolves are dead!"
@@ -169,10 +241,34 @@ public struct English: I18n {
         }
     }
     public func youAreNotA(_ role: Role) -> String {
-        "You aren't a \(roleName(role))!"
+        "You aren't a \(role.emoji) \(roleName(role))!"
     }
     public func youAreGoingToInvestigate(_ user: Mentionable) -> String
     { "You are going to investigate \(user.mention()) tonight!" }
+    public func locationName(_ location: DetectiveLocations) -> String {
+        switch location {
+        case .library:
+            "Town Library"
+        case .bar:
+            "Bar"
+        case .warehouse:
+            "Abandoned Warehouse"
+        case .villageSquare:
+            "Village Square"
+        }
+    }
+    public func youAreGoingToInvestigate(_ location: DetectiveLocations) -> String {
+        switch location {
+        case .library:
+            "You are going to visit the library tonight."
+        case .bar:
+            "You're taking a visit to the town bar tonight."
+        case .warehouse:
+            "You're investigating the warehouse tonight."
+        case .villageSquare:
+            "You're looking around the village square tonight."
+        }
+    }
     public func youAreGoingToFreeze(_ user: Mentionable) -> String
     { "You are going to freeze \(user.mention()) tonight!" }
     public func youAreGoingToKill(_ user: Mentionable) -> String
@@ -258,11 +354,15 @@ public struct English: I18n {
     public let oracleAction = "Time to ponder someone tonight!"
     public let cpAction = "Time to visit someone tonight!"
     public let gooseAction = "Time to goose someone tonight!"
+    public let detectiveAction = "Time to investigate somewhere tonight!"
     public let gaPrompt = "Choose someone to protect"
     public let seerPrompt = "Choose someone to see their role"
     public let oraclePrompt = "Choose someone to see what role they are not (from roles that are in the game)"
     public let cpPrompt = "Choose someone to visit during the night and give them cookies"
     public let goosePrompt = "Choose someone to goose tonight!"
+    public let detectivePrompt = "Choose somewhere to visit tonight!"
+    public let detectiveNothingHere = "Nothing to learn from this place. Perhaps somewhere else?"
+    public let detectiveCouldntInvestigate = "You had issues investigating."
     public let drWerewolf = "You were killed by a werewolf!"
     public let drExile = "You were exiled by the village!"
     public let drVisit = "You died because you visited a werewolf!"
@@ -312,7 +412,7 @@ public struct English: I18n {
         if alive {
             return "🙂 \(who.mention())"
         } else {
-            return "💀 \(who.mention()) (was a \(roleName(role)))" // TODO: should we show people's roles when they die?
+            return "💀 \(who.mention()) (was a \(role.emoji) \(roleName(role)))" // TODO: should we show people's roles when they die?
         }
     }
     public func beholderSeer(who: Mentionable) -> String {
@@ -387,12 +487,8 @@ public struct English: I18n {
             return "You are cursed! You appear as a villager to the seer, but, when the werewolf dies, you become a werewolf!"
         case .oracle:
             return "You are blessed by the deities with the gift of divination. Every night, you can choose a player. You will be told what role that player is *not*."
-        case .laundryperson:
-            return "You work the town's laundry, and realise that one of your clients left a doohickey in a basket for two. At the start of the game, you know that 1 of 2 players is a particular neutral or good role."
-        case .gossip:
-            return "You love to gossip! With your social savvy, you realise that one of three people in your favourite gossip circle is evil!"
-        case .librarian:
-            return "You're the sole person in the town's library. One of your recent patrons checked out an evil book, but you can't remember who. At the start of the game, you know that 1 of 2 players is a particular evil role."
+        case .detective:
+            return "You are the town's detective, trying to figure out who the criminals are. Every night, you can choose a place to investigate, which will give you a clue."
         case .bartender:
             return "You are the town's bartender! After hours, you can go to someone's house and give them a personal drink! Being drunk might make someone act silly, or pass out entirely. If you're out from home, and the werewolf tries to kill you, you'll survive because you weren't home. If the werewolves kill someone they're visiting, they'll kill you as well."
         }
@@ -427,8 +523,44 @@ public struct English: I18n {
             return "Make sure that other people don't out themselves before you tell them what they're not! This will help you prove to them that you are the oracle."
         case .bartender:
             return "You win with the village, so try and inebriate the werewolves! But, be careful not to confuse the seer."
-        case .laundryperson, .gossip, .librarian:
-            return "Share what you know with the group!"
+        case .detective:
+            return "Investigate as much as you can!"
+        }
+    }
+    public func clue(_ clue: ClueMessage) -> String {
+        switch clue {
+        case .libraryIsEvil(let a, let b):
+            "You see someone checking out an evil book from the library, but aren't sure who it is. **Either \(a.mention()) or \(b.mention()) is evil.**"
+        case .librarySeerOrBeholder(let a, let b):
+            "You see someone checking out a psychic book from the library, but aren't sure who it is. **Either \(a.mention()) or \(b.mention()) is the Seer or the Beholder.**"
+        case .libraryCookiePerson(let a, let b):
+            "You smell someone with cookies in the library, but aren't sure who it is. **Either \(a.mention()) or \(b.mention()) is the Cookie Person.**"
+        case .barIsEvil(let a, let b, let c):
+            "You see someone with a knife in the bar, but it's not clear who they are. **Either \(a.mention()), \(b.mention()), or \(c.mention()) is evil.**"
+        case .barGuardianAngelOrInnocent(let a):
+            "Someone in the bar has a heavenly aura to them, but you aren't sure who they are. **Either \(a.mention()) is the Guardian Angel or Innocent.**"
+        case .barVillager(let a, let b):
+            "Someone looked extremely ordinary. You forgot their exact details. **Either \(a.mention()) or \(b.mention()) is a Villager.**"
+        case .warehouseIsEvil(let a, let b):
+            "In the abandoned warehouse, you see someone plotting in the shadows. **Either \(a.mention()) or \(b.mention()) is evil.**"
+        case .warehouseJester(let a, let b):
+            "In the abandoned warehouse, you hear someone jesting loudly. **Either \(a.mention()) or \(b.mention()) is the Jester.**"
+        case .warehouseOracle(let a, let b):
+            "You see an old advertisement for an oracle with a vaguely familiar face. **Either \(a.mention()) or \(b.mention()) is the Oracle.**"
+        case .villageCenterIsEvil(let a, let b, let c):
+            "You overhear someone discussing murder plans by the fountain. **Either \(a.mention()), \(b.mention()), or \(c.mention()) is evil.**"
+        case .villageCenterPacifist(let a, let b):
+            "There's signs of tampering in the execution centre. **Either \(a.mention()) or \(b.mention()) is the Pacifist.**"
+        case .villageCenterFurry(let a, let b, let c):
+            "You see someone donning a fursuit in the woods. **Either \(a.mention()), \(b.mention()), or \(c.mention()) is a Furry.**"
+        case .villageCenterInnocent(let a, let b):
+            "Some people were really nice to you today. **Either \(a.mention()) or \(b.mention()) is the Innocent.**"
+        case .villageCenterBeholder(let a, let b):
+            "You overhear people discussing Seer training. **Either \(a.mention()) or \(b.mention()) is the Beholder.**"
+        case .villageCenterJester(let a, let b):
+            "Someone is juggling, menacingly. **Either \(a.mention()) or \(b.mention()) is the Jester.**"
+        case .villageCenterCookiePerson(let a, let b):
+            "You longingly gaze at the cookie shop from the village square and see someone inside. **Either \(a.mention()) or \(b.mention()) is the Cookie Person.**"
         }
     }
     public func roleName(_ role: Role) -> String {
@@ -461,12 +593,27 @@ public struct English: I18n {
             return "Oracle"
         case .bartender:
             return "Bartender"
-        case .laundryperson:
-            return "Laundryperson"
-        case .gossip:
-            return "Gossip"
-        case .librarian:
-            return "Librarian"
+        case .detective:
+            return "Detective"
+        }
+    }
+    public func roleSummary(_ role: Role) -> String {
+        switch role {
+        case .villager: "has no special abilities"
+        case .werewolf: "kills one person a night"
+        case .guardianAngel: "protects one person a night from being killed"
+        case .seer: "can learn the role of one person a night"
+        case .beholder: "knows who the Seer is"
+        case .jester: "wants to get exiled"
+        case .cookiePerson: "can visit people and know they aren't evil if they survive the visit"
+        case .furry: "appears as a werewolf to the Seer"
+        case .innocent: "the first person to nominate the Innocent gets smitten if they aren't evil"
+        case .pacifist: "has a chance to save wrongly exiled people"
+        case .goose: "randomises people's targets, gets violent when werewolves are dead"
+        case .cursed: "turns into a werewolf when the werewolves die"
+        case .oracle: "can learn one role someone is not every night"
+        case .bartender: "can inebriate someone every night"
+        case .detective: "can get a clue every night"
         }
     }
     public func teamName(_ team: Team) -> String {
@@ -507,9 +654,9 @@ public struct TokiPona: I18n {
     public func pacifistIntervention(who: Mentionable) -> String { "jan pi utala ala li weka e \(who.mention()) tan tomo moli! ona li moli ala!" }
     public func nominatedInnocent(who: Mentionable) -> String { "\(who.mention()) li wile weka e jan pi ike ala! ni li ike suli tawa kulupu sewi! ona li kama moli tan ni. pakala." }
     public func protectedWerewolf(who: Mentionable) -> String { "\(who.mention()) li awen e soweli mun. taso wawa ike pi soweli mun li moli e ona! pakala." }
-    public func wasA(_ role: Role) -> String { "li \(roleName(role))" }
-    public func check(who: Mentionable, is role: Role) -> String { "\(who.mention()) li \(roleName(role))!" }
-    public func check(who: Mentionable, isNot role: Role) -> String { "\(who.mention()) li \(roleName(role)) ala!" }
+    public func wasA(_ role: Role) -> String { "li \(role.emoji) \(roleName(role))" }
+    public func check(who: Mentionable, is role: Role) -> String { "\(who.mention()) li \(role.emoji) \(roleName(role))!" }
+    public func check(who: Mentionable, isNot role: Role) -> String { "\(who.mention()) li \(role.emoji) \(roleName(role)) ala!" }
     public func victory(_ reason: VictoryReason) -> String {
         switch reason {
         case .allWerewolvesDead: return "kulupu ike li moli!"
@@ -529,6 +676,30 @@ public struct TokiPona: I18n {
     }
     public func youAreGoingToInvestigate(_ user: Mentionable) -> String
     { "\(user.mention()) la sina alasa sona." }
+    public func locationName(_ location: DetectiveLocations) -> String {
+        switch location {
+        case .library:
+            "tomo lipu"
+        case .bar:
+            "tomo pi telo nasa"
+        case .warehouse:
+            "tomo poki majuna"
+        case .villageSquare:
+            "ma suli pi ma tomo"
+        }
+    }
+    public func youAreGoingToInvestigate(_ location: DetectiveLocations) -> String {
+        switch location {
+        case .library:
+            "sina tawa tomo lipu li alasa lon ona."
+        case .bar:
+            "sina alasa sona e sona tan tomo pi telo nasa."
+        case .warehouse:
+            "sina lukin lon tomo poki majuna."
+        case .villageSquare:
+            "sina lukin lon ma suli."
+        }
+    }
     public func youAreGoingToFreeze(_ user: Mentionable) -> String
     { "tenpo mun la sina kama lete e \(user.mention())!" }
     public func youAreGoingToKill(_ user: Mentionable) -> String
@@ -585,11 +756,15 @@ public struct TokiPona: I18n {
     public let oracleAction = "o sona e pali ala jan!"
     public let cpAction = "o pan e jan!"
     public let gooseAction = "o waso e jan!"
+    public let detectiveAction = "o alasa lon ma ni!"
     public let gaPrompt = "sina wile awen e jan seme?"
     public let seerPrompt = "sina wile sona e pali pi jan seme?"
     public let oraclePrompt = "sina wile sona e pali ala pi jan seme?"
     public let cpPrompt = "sina wile pana e pan tawa jan seme?"
     public let goosePrompt = "sina wile waso e jan seme?"
+    public let detectivePrompt = "sina wile alasa sona lon ma seme?"
+    public let detectiveNothingHere = "ma ni li pana ala sona. o alasa lon ma ante."
+    public let detectiveCouldntInvestigate = "pakala li pini e alasa sina."
     public let drWerewolf = "soweli mun li moli e sina!"
     public let drExile = "jan li weka e sina!"
     public let drVisit = "sina tawa tomo pi soweli mun la, soweli mun li moli e sina!"
@@ -639,7 +814,7 @@ public struct TokiPona: I18n {
         if alive {
             return "🙂 \(who.mention())"
         } else {
-            return "💀 \(who.mention()) (li \(roleName(role)))" // TODO: should we show people's roles when they die?
+            return "💀 \(who.mention()) (li \(role.emoji) \(roleName(role)))" // TODO: should we show people's roles when they die?
         }
     }
     public func beholderSeer(who: Mentionable) -> String {
@@ -714,12 +889,8 @@ public struct TokiPona: I18n {
             return "sina jan pi kama ike! jan lukin li lukin e ni: sina jan pi pali ala. taso, soweli mun li moli la, sina kama soweli mun!"
         case .oracle:
             return "wawa sewi li pana e ken ni tawa sina: sina sona e pali ala jan. (pali toki li lon musi.)"
-        case .laundryperson:
-            return "sina telo e len la, sina oko e ni: ilo li lon poki len pi jan tu a! open musi la, sina sona e ni: jan wan tan kulupu tu li jo e ilo ni (e poki ona)."
-        case .gossip:
-            return "sina toki mute a! sina toki pona la, sina kama sona e ni: jan wan tan kulupu tuli li ike a!"
-        case .librarian:
-            return "sina pali lon tomo lipu. jan li alasa e lipu ike tan ona. sona pi nimi ona li weka tan lawa sina a... taso sina sona e jan pini tu a! wan tan tu ni li ike a!"
+        case .detective:
+            return "sina jan alasa sona pi ma ni. sina alasa e ijo ike. mun la sina ken alasa sona lon tomo wile."
         case .bartender:
             return "sina tan pi telo nasa tawa tomo ni! tenpo pi tomo pali sina li pini la sina ken tawa tomo ante li ken pana e telo nasa tawa ona. telo nasa li ken nasa e pali ona li ken pini e pali ona. soweli li tawa tomo sina la, sina tawa jan ante la, sina moli ala! sina en soweli mun li lon tomo sama la, ona li moli kin e sina."
         }
@@ -754,8 +925,44 @@ public struct TokiPona: I18n {
             return "jan li toki ala e pali ona la sina toki e pali ala ona la jan li sona e ni: sina ken kama sona e pali ona a!"
         case .bartender:
             return "kulupu tomo li awen la sina awen kin. ni la o nasa e kulupu ike! taso, o nasa ala e jan lukin..."
-        case .laundryperson, .gossip, .librarian:
-            return "o pana e sona sina tawa kulupu a!"
+        case .detective:
+            return "o alasa sona lon ma mute a!"
+        }
+    }
+    public func clue(_ clue: ClueMessage) -> String {
+        switch clue {
+        case .libraryIsEvil(let a, let b):
+            "sina lukin e ni: jan li lukin e lipu ike. **\(a.mention()) anu \(b.mention()) li ike.**"
+        case .librarySeerOrBeholder(let a, let b):
+            "sina lukin e ni: jan li lukin e lipu pi lukin wawa. **\(a.mention()) anu \(b.mention()) li jan lukin anu jan lukin lukin.**"
+        case .libraryCookiePerson(let a, let b):
+            "kon pi pan suwi li pona tawa sina. jan li pana e ona tawa jan lipu. **\(a.mention()) anu \(b.mention()) li jan pi pan suwi.**"
+        case .barIsEvil(let a, let b, let c):
+            "jan lon tomo nasa li jo e palisa kiki ike. **\(a.mention()) anu \(b.mention()) anu \(c.mention()) li ike.**"
+        case .barGuardianAngelOrInnocent(let a):
+            "jan lon tomo telo li pana e pona. **\(a.mention()) li jan awen sewi anu jan pi ike ala.**"
+        case .barVillager(let a, let b):
+            "jan li lon tomo pi telo nasa. ona li ante lukin ala. **\(a.mention()) anu \(b.mention()) li pali ala.**"
+        case .warehouseIsEvil(let a, let b):
+            "sina oko e jan ike lon pimeja pi tomo poki. **\(a.mention()) anu \(b.mention()) li ike.**"
+        case .warehouseJester(let a, let b):
+            "sina kute e kalama nasa lon tomo poki. **\(a.mention()) anu \(b.mention()) li jan nasa.**"
+        case .warehouseOracle(let a, let b):
+            "lipu majuna lon tomo poki li toki e ni: o kama tawa jan oko a! **\(a.mention()) anu \(b.mention()) li jan oko.**"
+        case .villageCenterIsEvil(let a, let b, let c):
+            "jan li toki e pali moli lon poka telo pi lukin pona. **\(a.mention()) anu \(b.mention()) anu \(c.mention()) li ike.**"
+        case .villageCenterPacifist(let a, let b):
+            "poki pi wile kulupu li nasa lukin. sina sona lili e ni: seme li pali e ni? **\(a.mention()) anu \(b.mention()) li jan pi utala ala.**"
+        case .villageCenterFurry(let a, let b, let c):
+            "jan li len e ona kepeken len soweli. **\(a.mention()) anu \(b.mention()) anu \(c.mention()) li jan soweli.**"
+        case .villageCenterInnocent(let a, let b):
+            "jan li pana e pona suli tawa sina. **\(a.mention()) anu \(b.mention()) li jan pi ike ala.**"
+        case .villageCenterBeholder(let a, let b):
+            "sina kute e ni: jan li toki e wawa lukin. **\(a.mention()) anu \(b.mention()) li jan lukin lukin.**"
+        case .villageCenterJester(let a, let b):
+            "jan li nasa lukin lon ma tomo. **\(a.mention()) anu \(b.mention()) li jan nasa.**"
+        case .villageCenterCookiePerson(let a, let b):
+            "sina lukin e tomo pi pan suwi li wile e pan suwi. sina lukin lili e jan pali ona. **\(a.mention()) anu \(b.mention()) li jan pi pan suwi.**"
         }
     }
     public func roleName(_ role: Role) -> String {
@@ -788,12 +995,27 @@ public struct TokiPona: I18n {
             return "jan oko"
         case .bartender:
             return "jan pi telo nasa"
-        case .laundryperson:
-            return "jan pi telo len"
-        case .gossip:
-            return "jan toki"
-        case .librarian:
-            return "jan lipu"
+        case .detective:
+            return "jan pi alasa sona"
+        }
+    }
+    public func roleSummary(_ role: Role) -> String {
+        switch role {
+        case .villager: "ona li pali ala."
+        case .werewolf: "ona li moli e jan."
+        case .guardianAngel: "ona li awen e jan."
+        case .seer: "ona li ken sona e pali jan."
+        case .beholder: "ona li sona e jan lukin."
+        case .jester: "ona li wile kama weka."
+        case .cookiePerson: "ona li ken tawa tomo jan. ona li moli ala la ona li sona e ike ala ona."
+        case .furry: "jan lukin la ona li soweli lukin."
+        case .innocent: "jan pona li wile weka e ona la wawa sewi li moli e ni."
+        case .pacifist: "kulupu li wile weka e jan pona la ona li ken awen e ona."
+        case .goose: "ona li nasa e wile pali jan. soweli li moli la ona li utala."
+        case .cursed: "soweli li moli la ona li kama soweli."
+        case .oracle: "ona li ken sona e pali ala jan."
+        case .bartender: "ona li ken telo nasa e jan."
+        case .detective: "ona li ken alasa e sona lili."
         }
     }
     public func teamName(_ team: Team) -> String {

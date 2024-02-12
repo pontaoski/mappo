@@ -118,6 +118,13 @@ class MatrixChannel: Sendable, I18nable {
 		)
 		return MatrixMessage(client: client, room: room, messageID: msg, threadID: thread)
 	}
+
+	func send(textSelection options: [(String, String)], id: TextSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
+		struct NotImplemented: LocalizedError {
+
+		}
+		throw NotImplemented()
+	}
 }
 
 class MatrixMessage: Deletable, Replyable {

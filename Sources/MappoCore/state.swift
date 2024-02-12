@@ -1,6 +1,7 @@
 import NIO
 import OrderedCollections
 import Foundation
+import Logging
 
 public class ConditionVariable {
 	let promise: EventLoopPromise<Void>
@@ -40,9 +41,7 @@ public enum Role: CaseIterable {
 	case cursed
 	case oracle
 	case bartender
-	case laundryperson
-	case gossip
-	case librarian
+	case detective
 
 	func appearsAs(to: Role) -> Role {
 		switch (self, to) {
@@ -86,9 +85,29 @@ public enum Role: CaseIterable {
 		}
 	}
 
+	var emoji: String {
+		switch self {
+		case .villager: "🧑"
+		case .werewolf: "🐺"
+		case .guardianAngel: "👼"
+		case .seer: "🔮"
+		case .beholder: "👁️"
+		case .jester: "🃏"
+		case .cookiePerson: "🍪"
+		case .furry: "🦊"
+		case .innocent: "😇"
+		case .pacifist: "☮️"
+		case .goose: "🪿"
+		case .cursed: "😾"
+		case .oracle: "🏛️"
+		case .bartender: "🍻"
+		case .detective: "🔎"
+		}
+	}
+
 	var absoluteMax: Int {
 		switch self {
-		case .guardianAngel, .seer, .oracle, .beholder, .jester, .cookiePerson, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian, .bartender:
+		case .guardianAngel, .seer, .oracle, .beholder, .jester, .cookiePerson, .innocent, .pacifist, .cursed, .detective, .bartender:
 			return 1
 		case .furry:
 			return 2
@@ -124,7 +143,7 @@ public enum Role: CaseIterable {
 			return 2
 
 		// active roles
-		case .bartender:
+		case .bartender, .detective:
 			return 6
 
 		// defensive roles
@@ -148,12 +167,6 @@ public enum Role: CaseIterable {
 			return 10
 		case .cursed:
 			return 8
-
-		// sog roles
-		case .laundryperson, .gossip, .librarian:
-			// we don't really want more than one of these for an average-sized game, so their
-			// strength spikes dramatically
-			return Double(4 * party.filter{ Role.startOfGameInfoRoles.contains($0) }.count)
 		}
 	}
 
@@ -205,7 +218,6 @@ public enum Role: CaseIterable {
 	static let werewolves: [Role] = Role.allCases.filter { $0.defaultTeam == .werewolf }
 
 	static let wolves: Set<Role> = [.werewolf]
-	static let startOfGameInfoRoles: Set<Role> = [.laundryperson, .gossip, .librarian]
 }
 
 public enum Team: Equatable {
@@ -336,10 +348,21 @@ public enum MultiUserSelectionID: String {
 	case nominate = "nominate"
 }
 
+public enum TextSelectionID: String {
+	case detective = "detective"
+}
+
 public enum ButtonID: String {
 	case nominateSkip = "skip"
 	case voteYes = "yes"
 	case voteNo = "no"
+}
+
+public enum DetectiveLocations: String {
+	case library = "library"
+	case bar = "bar"
+	case warehouse = "warehouse"
+	case villageSquare = "village-square"
 }
 
 public protocol Sendable {
@@ -351,6 +374,7 @@ public protocol Sendable {
 	func send(_ buttons: [CommunicationButton]) async throws -> Message
 	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
 	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
+	func send(textSelection options: [(String, String)], id: TextSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
 }
 
 public extension Sendable {
@@ -359,6 +383,9 @@ public extension Sendable {
 	}
 	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String) async throws -> Message {
 		try await self.send(multiUserSelection: options, id: id, label: label, buttons: [])
+	}
+	func send(textSelection options: [(String, String)], id: TextSelectionID, label: String) async throws -> Message {
+		try await self.send(textSelection: options, id: id, label: label, buttons: [])
 	}
 }
 
@@ -418,6 +445,7 @@ public class State<Comm: Communication> {
 		case inebriateRandom(who: Comm.UserID)
 		case inebriateFail(who: Comm.UserID)
 		case failedInebriate(who: Comm.UserID)
+		case detectiveInvestigate(at: DetectiveLocations)
 
 		func isValid<T: Sequence>(doer: Comm.UserID, with actions: T) -> Bool where T.Element == Action {
 			if actions.contains(.freeze(who: doer)) {
@@ -450,12 +478,14 @@ public class State<Comm: Communication> {
 				return .oracleCheck(who: to)
 			case .protect:
 				return .protect(who: to)
+			case .detectiveInvestigate(_):
+				return self
 			}
 		}
 
 		var awayFromHome: Bool {
 			switch self {
-			case .kill, .giveCookies, .inebriateRandom, .inebriateFail, .failedInebriate:
+			case .kill, .giveCookies, .inebriateRandom, .inebriateFail, .failedInebriate, .detectiveInvestigate:
 				return true
 			case .freeze, .protect, .check, .goose, .oracleCheck:
 				return false
@@ -502,6 +532,9 @@ public class State<Comm: Communication> {
 	// what action messages have been sent
 	var actionMessages: [Comm.UserID: Comm.Message] = [:]
 
+	// role messages
+	var roleMessages: [Comm.UserID: Comm.Message] = [:]
+
 	// who's alive?
 	var alive: [Comm.UserID: Bool] = [:]
 
@@ -521,7 +554,11 @@ public class State<Comm: Communication> {
 
 	var nominatedBefore: Set<Comm.UserID> = []
 
+	var givenClues: [Comm.UserID: [ClueMessage.Tag]] = [:]
+
 	var i18n: I18n
+
+	let logger = Logger(label: "cc.blackquill.Mappo")
 
 	public init(for channel: Comm.Channel, in comm: Comm, eventLoop: EventLoop) {
 		self.channel = channel
@@ -549,6 +586,7 @@ public class State<Comm: Communication> {
 		self.alive = [:]
 		self.votes = [:]
 		self.nominatedBefore = []
+		self.givenClues = [:]
 	}
 
 	func tickDay() {
@@ -592,8 +630,11 @@ public class State<Comm: Communication> {
 			let dms = try await comm.getChannel(for: user, state: self)
 			let role = roles[user]!
 			do {
-				_ = try await dms?.send(
-					CommunicationEmbed(title: i18n.roleName(role), body: i18n.roleDescription(role) + "\n\n" + i18n.strategyBlurb(for: role))
+				if let old = roleMessages[user] {
+					try await old.delete()
+				}
+				roleMessages[user] = try await dms?.send(
+					CommunicationEmbed(title: role.emoji + " " + i18n.roleName(role), body: i18n.roleDescription(role) + "\n\n" + i18n.strategyBlurb(for: role))
 				)
 			} catch {
 				_ = try await channel.send("I can't DM \(user.mention())! \(error)")
@@ -726,6 +767,8 @@ public class State<Comm: Communication> {
 	func startPlaying() async throws {
 		state = .playing
 
+		roleMessages = [:]
+
 		// TODO: create a thread
 		thread = try await comm.createGameThread(state: self)
 
@@ -741,22 +784,6 @@ public class State<Comm: Communication> {
 			case .beholder:
 				let seer = roles.filter { $0.value == .seer }[0]
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.beholderSeer(who: seer.key)))
-			case .laundryperson:
-				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .village }.randomElement()!
-				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
-				let (p1, p2) = randomize(player1, player2)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.laundrypersonStart(p1, p2, roles[player1]!)))
-			case .gossip:
-				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .werewolf }.randomElement()!
-				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
-				let player3 = party.filter{$0 != user && $0 != player1 && $0 != player2}.randomElement()!
-				let (p1, p2, p3) = randomize(player1, player2, player3)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.gossip(p1, p2, p3)))
-			case .librarian:
-				let player1 = party.filter{$0 != user}.filter{ teams[$0]! == .werewolf }.randomElement()!
-				let player2 = party.filter{$0 != user && $0 != player1}.randomElement()!
-				let (p1, p2) = randomize(player1, player2)
-				_ = try await dm?.send(CommunicationEmbed(body: i18n.librarianStart(p1, p2, roles[player1]!)))
 			default:
 				break
 			}
@@ -789,8 +816,13 @@ public class State<Comm: Communication> {
 				continue
 			}
 			switch roles[user]! {
-			case .villager, .jester, .beholder, .furry, .innocent, .pacifist, .cursed, .laundryperson, .gossip, .librarian:
+			case .villager, .jester, .beholder, .furry, .innocent, .pacifist, .cursed:
 				break
+			case .detective:
+				_ = try await dm.send(CommunicationEmbed(title: i18n.detectiveAction))
+				actionMessages[user] = try await dm.send(textSelection: [DetectiveLocations.library, .bar, .warehouse].map {
+					(i18n.locationName($0), $0.rawValue)
+				}, id: .detective, label: i18n.detectivePrompt)
 			case .werewolf:
 				let menu: Set<Comm.UserID>
 				if self.timeOfYear == .earlyWinter || self.timeOfYear == .lateWinter {
@@ -803,27 +835,27 @@ public class State<Comm: Communication> {
 				actionMessages[user] = try await dm.send(userSelection: menu, id: .werewolfKill, label: "")
 			case .guardianAngel:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.gaAction))
-				let possible = party.filter { alive[$0]! }
+				let possible = Array(party.filter { alive[$0]! })
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .guardianAngelProtect, label: i18n.gaPrompt)
 			case .seer:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.seerAction))
-				let possible = party.filter { $0 != user }.filter { alive[$0]! }
+				let possible = Array(party.filter { $0 != user }.filter { alive[$0]! })
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .seerInvestigate, label: i18n.seerPrompt)
 			case .oracle:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.oracleAction))
-				let possible = party.filter { $0 != user }.filter { alive[$0]! }
+				let possible = Array(party.filter { $0 != user }.filter { alive[$0]! })
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .oracleInvestigate, label: i18n.oraclePrompt)
 			case .cookiePerson:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.cpAction))
-				let possible = party.filter { $0 != user }.filter { alive[$0]! }
+				let possible = Array(party.filter { $0 != user }.filter { alive[$0]! })
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .cookiesGive, label: i18n.cpPrompt)
 			case .goose:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.gooseAction))
-				let possible = party.filter { $0 != user }.filter { alive[$0]! }.filter { teams[$0]! != .werewolf }
+				let possible = Array(party.filter { $0 != user }.filter { alive[$0]! }.filter { teams[$0]! != .werewolf })
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .goose, label: i18n.goosePrompt)
 			case .bartender:
 				_ = try await dm.send(CommunicationEmbed(title: i18n.bartenderAction))
-				let possible = party.filter{ $0 != user }.filter{ alive[$0]! }
+				let possible = Array(party.filter{ $0 != user }.filter{ alive[$0]! })
 				actionMessages[user] = try await dm.send(userSelection: possible, id: .bartenderInebriate, label: i18n.bartenderPrompt)
 			}
 		}
@@ -985,6 +1017,124 @@ public class State<Comm: Communication> {
 		}
 	}
 
+	func libraryInvestigation(as user: Comm.UserID) async throws -> [ClueMessage] {
+		var ret: [ClueMessage] = []
+
+		if let player1 = party.filter({$0 != user}).filter({teams[$0] != .village}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.libraryIsEvil(a, b))
+		}
+		if let player1 = party.filter({$0 != user}).filter({roles[$0] == .seer || roles[$0] == .beholder}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.librarySeerOrBeholder(a, b))
+		}
+		if let player1 = party.filter({$0 != user}).filter({roles[$0] == .cookiePerson}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.libraryCookiePerson(a, b))
+		}
+
+		return ret
+	}
+
+	func barInvestigation(as user: Comm.UserID) async throws -> [ClueMessage] {
+		var ret: [ClueMessage] = []
+
+		if let player1 = party.filter({$0 != user}).filter({teams[$0] != .village}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement(),
+			let player3 = party.filter({$0 != user}).filter({$0 != player1 && $0 != player2}).randomElement() {
+
+			let (a, b, c) = randomize(player1, player2, player3)
+			ret.append(.barIsEvil(a, b, c))
+		}
+		if let player1 = party.filter({$0 != user}).filter({roles[$0] == .guardianAngel || roles[$0] == .innocent}).randomElement() {
+			ret.append(.barGuardianAngelOrInnocent(player1))
+		}
+		if let player1 = party.filter({$0 != user}).filter({roles[$0] == .villager}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.barVillager(a, b))
+		}
+
+		return ret
+	}
+
+	func warehouseInvestigation(as user: Comm.UserID) async throws -> [ClueMessage] {
+		var ret: [ClueMessage] = []
+
+		if let player1 = party.filter({$0 != user}).filter({teams[$0] != .village}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.warehouseIsEvil(a, b))
+		}
+		if let player1 = party.filter({$0 != user}).filter({teams[$0] == .jester}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.warehouseJester(a, b))
+		}
+		if let player1 = party.filter({$0 != user}).filter({roles[$0] == .oracle}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.warehouseOracle(a, b))
+		}
+
+		return ret
+	}
+
+	func villageCenterInvestigation(as user: Comm.UserID) async throws -> [ClueMessage] {
+		var ret: [ClueMessage] = []
+
+		if let player1 = party.filter({$0 != user}).filter({teams[$0] != .village}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement(),
+			let player3 = party.filter({$0 != user}).filter({$0 != player1 && $0 != player2}).randomElement() {
+
+			let (a, b, c) = randomize(player1, player2, player3)
+			ret.append(.villageCenterIsEvil(a, b, c))
+		} else if let player1 = party.filter({$0 != user}).filter({roles[$0] == .pacifist}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.villageCenterPacifist(a, b))
+		} else if let player1 = party.filter({$0 != user}).filter({roles[$0] == .furry}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement(),
+			let player3 = party.filter({$0 != user}).filter({$0 != player1 && $0 != player2}).randomElement() {
+
+			let (a, b, c) = randomize(player1, player2, player3)
+			ret.append(.villageCenterFurry(a, b, c))
+		} else if let player1 = party.filter({$0 != user}).filter({roles[$0] == .innocent}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.villageCenterInnocent(a, b))
+		} else if let player1 = party.filter({$0 != user}).filter({roles[$0] == .beholder}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.villageCenterBeholder(a, b))
+		} else if let player1 = party.filter({$0 != user}).filter({roles[$0] == .jester}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.villageCenterJester(a, b))
+		} else if let player1 = party.filter({$0 != user}).filter({roles[$0] == .cookiePerson}).randomElement(),
+			let player2 = party.filter({$0 != user}).filter({$0 != player1}).randomElement() {
+
+			let (a, b) = randomize(player1, player2)
+			ret.append(.villageCenterCookiePerson(a, b))
+		}
+
+		return ret
+	}
+
 	func endNight() async throws {
 		for actionMessage in actionMessages {
 			try await actionMessage.value.delete()
@@ -1022,6 +1172,25 @@ public class State<Comm: Communication> {
 			case .inebriateRandom(let who), .inebriateFail(let who), .failedInebriate(let who):
 				if actions.contains(where: { $0.value == .kill(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
 					try await attemptKill(action.key, because: .visitedSomeoneBeingVisitedByWerewolf(visiting: who))
+				}
+			case .detectiveInvestigate(let location):
+				let dm = try await comm.getChannel(for: action.key, state: self)
+				let existing = givenClues[action.key] ?? []
+				let possible = switch location {
+				case .library: try await libraryInvestigation(as: action.key)
+				case .bar: try await barInvestigation(as: action.key)
+				case .warehouse: try await warehouseInvestigation(as: action.key)
+				case .villageSquare: try await villageCenterInvestigation(as: action.key)
+				}
+				if let something = possible.filter({ !existing.contains($0.tag) }).randomElement() {
+					if Double.random(in: 0...1) >= 0.2 {
+						let _ = try await dm?.send(i18n.clue(something))
+						givenClues[action.key] = existing + [something.tag]
+					} else {
+						let _ = try await dm?.send(i18n.detectiveCouldntInvestigate)
+					}
+				} else {
+					let _ = try await dm?.send(i18n.detectiveNothingHere)
 				}
 			case .freeze(_), .goose(_):
 				continue
@@ -1255,7 +1424,7 @@ public class State<Comm: Communication> {
 		}
 
 		try await interaction.reply(with: CommunicationEmbed(
-			title: i18n.roleName(role),
+			title: role.emoji + " " + i18n.roleName(role),
 			body: i18n.roleDescription(role),
 			color: .info,
 			fields: [
@@ -1266,9 +1435,30 @@ public class State<Comm: Communication> {
 		), epheremal: true)
 	}
 	func sendRoles(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		let roles = Role.allCases.map{ i18n.roleName($0) }.map{ "- \($0)" }.joined(separator: "\n")
+		let roles = Role.allCases.map {
+			CommunicationEmbed.Field(
+				title: $0.emoji + " " + i18n.roleName($0),
+				body: i18n.roleSummary($0)
+			)
+		}
 
-		try await interaction.reply(with: CommunicationEmbed(title: i18n.headerRoles, body: roles, color: .info), epheremal: true)
+		try await interaction.reply(with: CommunicationEmbed(title: i18n.headerRoles, color: .info, fields: roles), epheremal: true)
+	}
+
+	public let textDropdowns = [
+		TextSelectionID.detective: detective
+	]
+	func detective(who: Comm.UserID, target: String, interaction: Comm.Interaction) async throws {
+		guard roles[who] == .detective else {
+			try await interaction.reply(with: i18n.youAreNotA(.detective), epheremal: true)
+			return
+		}
+		guard let location = DetectiveLocations(rawValue: target) else {
+			try await interaction.reply(with: "Internal Error", epheremal: true)
+			return
+		}
+		try await interaction.reply(with: i18n.youAreGoingToInvestigate(location), epheremal: true)
+		actions[who] = .detectiveInvestigate(at: location)
 	}
 
 	public let multiUserDropdowns = [
@@ -1281,7 +1471,7 @@ public class State<Comm: Communication> {
 		}
 
 		_ = try await interaction.reply(with: i18n.voteHasBeenRecorded, epheremal: true)
-		votes[who] = targets
+		votes[who] = targets.filter{ $0 != who }
 		if targets.contains(where: { roles[$0] == .innocent && !nominatedBefore.contains($0) }) && teams[who]! != .werewolf {
 			try await attemptKill(who, because: .nominatedInnocent)
 		}

@@ -151,6 +151,19 @@ class DiscordChannel: Sendable, I18nable {
 		let msg = try it.decode()
 		return Message(client: client, channelID: channelID, messageID: msg.id)
 	}
+	func send(textSelection options: [(String, String)], id: TextSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message {
+		let it = try await client.createMessage(
+			channelId: channelID,
+			payload: .init(
+				content: label,
+				components: [.init(components: [.stringSelect(.init(custom_id: id.rawValue, options: options.map { (name, id) in
+					return .init(label: name, value: id)
+				}, max_values: 1))]), .init(components: buttons.map(convertButton))].filter{$0.components.count > 0}
+			)
+		)
+		let msg = try it.decode()
+		return Message(client: client, channelID: channelID, messageID: msg.id)
+	}
 }
 
 class DiscordInteraction: Replyable {
@@ -340,8 +353,8 @@ class MyBot {
 		}
 	}
 	func selectMenuEvent(id: String, target: String, targets: [String], user: DiscordUser, intr: DiscordInteraction) async throws {
-		let target = UserSnowflake(target)
-		let targets = targets.map{UserSnowflake($0)}
+		let userTarget = UserSnowflake(target)
+		let userTargets = targets.map{UserSnowflake($0)}
 		guard let state = gs.userStates[user.id] else {
 			try await intr.reply(with: "Oops, it doesnt look like you're in a game, sorry.", epheremal: true)
 			return
@@ -349,11 +362,15 @@ class MyBot {
 
 		if let susID = SingleUserSelectionID.init(rawValue: id),
 			let dropdown = state.singleUserDropdowns[susID] {
-			try await dropdown(state)(user.id, target, intr)
+			try await dropdown(state)(user.id, userTarget, intr)
 		} else if let musID = MultiUserSelectionID.init(rawValue: id),
 			let dropdown = state.multiUserDropdowns[musID] {
 
-			try await dropdown(state)(user.id, targets, intr)
+			try await dropdown(state)(user.id, userTargets, intr)
+		} else if let texID = TextSelectionID(rawValue: id),
+			let dropdown = state.textDropdowns[texID] {
+
+			try await dropdown(state)(user.id, target, intr)
 		} else {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(id)). Sorry.", epheremal: true)
 		}

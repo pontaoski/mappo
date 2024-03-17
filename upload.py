@@ -25,6 +25,7 @@ commands = [
     {"type":1,"options":[],"description":"Leave a lobby","default_permission":True,"name":"leave"},
     {"type":1,"options":[],"description":"View the current party","default_permission":True,"name":"party"},
     {"type":1,"options":[],"description":"Lists all roles","default_permission":True,"name":"roles"},
+    {"type":1,"options":[],"description":"Instantly completes the current wait","default_permission":True,"name":"continue"},
     {"type":1,"options":[{
         "name": "role",
         "description": "The role whose information to get",

@@ -441,10 +441,6 @@ public enum Waits {
 	var durationNanoseconds: UInt64 {
 		UInt64(durationSeconds * 1_000_000_000)
 	}
-
-	func sleep() async throws {
-		try await Task.sleep(nanoseconds: durationNanoseconds)
-	}
 }
 
 public protocol Communication {
@@ -635,6 +631,20 @@ public class State<Comm: Communication> {
 		}
 	}
 
+	var currentPause: Task<Void, Error>? = nil
+	func waitFor(_ wait: Waits) async throws {
+		currentPause = Task {
+			try await Task.sleep(nanoseconds: wait.durationNanoseconds)
+		}
+		let _ = await currentPause?.result
+	}
+
+	func cancelPause() async throws {
+		if let task = currentPause {
+			task.cancel()
+		}
+	}
+
 	func startTimerExpired() async throws {
 		guard party.count >= 4 else {
 			state = .idle
@@ -719,7 +729,7 @@ public class State<Comm: Communication> {
 		// night actions
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.nightTitle(timeOfYear, year: year, day: day)))
 		try await startNight()
-		try await Waits.nightTime.sleep()
+		try await waitFor(Waits.nightTime)
 
 		// finish up night actions
 		try await endNight()
@@ -731,11 +741,11 @@ public class State<Comm: Communication> {
 		_ = try await thread?.send(i18n.villagersGather)
 		_ = try await thread?.send(i18n.itIsDaytime(seconds: Waits.dayStart.durationSeconds + Waits.dayEnding.durationSeconds))
 
-		try await Waits.dayStart.sleep()
+		try await waitFor(Waits.dayStart)
 
 		_ = try await thread?.send(i18n.dayTimeRunningOut(seconds: Waits.dayEnding.durationSeconds))
 
-		try await Waits.dayEnding.sleep()
+		try await waitFor(Waits.dayEnding)
 
 		resetVotes()
 		_ = try await thread?.send(i18n.eveningDraws(seconds: Waits.nominationsStart.durationSeconds + Waits.nominationsEnding.durationSeconds))
@@ -745,7 +755,7 @@ public class State<Comm: Communication> {
 			label: i18n.nominationTitle
 		)
 
-		try await Waits.nominationsStart.sleep()
+		try await waitFor(Waits.nominationsStart)
 
 		_ = try await thread?.send(
 			multiUserSelection: party.filter { alive[$0]! },
@@ -753,7 +763,7 @@ public class State<Comm: Communication> {
 			label: i18n.nominationEndingSoonTitle(seconds: Waits.nominationsEnding.durationSeconds)
 		)
 
-		try await Waits.nominationsEnding.sleep()
+		try await waitFor(Waits.nominationsEnding)
 
 		let allVotes = votes.flatMap { $0.value }
 		let votedPlayers = Dictionary(allVotes.map { key in (key, allVotes.filter { $0 == key }.count) }, uniquingKeysWith: { a, _ in a })
@@ -1276,8 +1286,8 @@ public class State<Comm: Communication> {
 		"join": join,
 		"leave": leave,
 		"party": party,
-		"start": start,
 		"roles": sendRoles,
+		"continue": continueTimer,
 	]
 	public let userCommands = [
 		"promote": promote,
@@ -1368,27 +1378,19 @@ public class State<Comm: Communication> {
 			[.init(id: .joinGame, label: i18n.joinGame)]
 		)
 	}
+	func continueTimer(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard who == party.first else {
+			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
+			return
+		}
+		try await cancelPause()
+		try await interaction.reply(with: i18n.resumed, epheremal: true)
+	}
 	func party(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		_ = try await interaction.reply(
 			with: CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "\($0.mention())" }.joined(separator: "\n")),
 			epheremal: false
 		)
-	}
-	func start(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard who == party.first else {
-			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
-			return
-		}
-		guard state != .playing else {
-			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
-			return
-		}
-		guard state == .assigned else {
-			try await interaction.reply(with: i18n.mustSetUpBeforeStarting, epheremal: true)
-			return
-		}
-		try await interaction.reply(with: i18n.gameHasBeenStarted, epheremal: false)
-		try await startPlaying()
 	}
 	func promote(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard who == party.first else {

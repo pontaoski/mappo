@@ -191,6 +191,7 @@ public protocol I18n {
     var assigningRoles: String { get }
     var readRoles: String { get }
     var gameStarting: String { get }
+    var resumed: String { get }
 }
 
 public struct English: I18n {
@@ -409,6 +410,7 @@ public struct English: I18n {
     public let assigningRoles = "Assigning roles..."
     public let readRoles = "Read the roles!"
     public let gameStarting = "The game is starting!"
+    public let resumed = "The game is continuing!"
 
     public init()
     {
@@ -828,6 +830,7 @@ public struct TokiPona: I18n {
     public let assigningRoles = "mi pana e pali..."
     public let readRoles = "o lukin e pali a!"
     public let gameStarting = "musi li open a!"
+    public let resumed = "musi li awen tawa a!"
 
     public init()
     {

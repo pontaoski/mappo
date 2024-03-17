@@ -81,6 +81,11 @@ class DiscordChannel: Sendable, I18nable {
 		let msg = try it.decode()
 		return Message(client: client, channelID: channelID, messageID: msg.id)
 	}
+	func send(_ embed: CommunicationEmbed, _ buttons: [CommunicationButton]) async throws -> Message {
+		let it = try await client.createMessage(channelId: channelID, payload: .init(embeds: [embed.discord], components: [.init(components: buttons.map(convertButton))]))
+		let msg = try it.decode()
+		return Message(client: client, channelID: channelID, messageID: msg.id)
+	}
 	private func convertButton(_ btn: CommunicationButton) -> Interaction.ActionRow.Component {
 		let style: Interaction.ActionRow.Button.NonLinkStyle
 		switch btn.color {
@@ -376,10 +381,12 @@ class MyBot {
 		}
 	}
 	func buttonClickEvent(btn: String, user: DiscordUser, intr: DiscordInteraction) async throws {
-		guard let state = gs.userStates[user.id] else {
-			try await intr.reply(with: "Oops, it doesnt look like you're in a game, sorry.", epheremal: true)
-			return
-		}
+		let channel = try await self.state(for: intr.event.channel_id!)
+		let state = gs.userStates[user.id] ?? channel
+		// guard  else {
+		// 	try await intr.reply(with: "Oops, it doesnt look like you're in a game, sorry.", epheremal: true)
+		// 	return
+		// }
 
 		if let buttonID = ButtonID(rawValue: btn),
 			let button = state.buttons[buttonID] {

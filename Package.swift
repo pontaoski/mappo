@@ -26,9 +26,9 @@ let package = Package(
         .executableTarget(
             name: "Mappo",
             dependencies: ["MappoCore", .product(name: "DiscordBM", package: "DiscordBM"), .product(name: "AsyncKit", package: "async-kit")]),
-        .executableTarget(
-            name: "Mapptrix",
-            dependencies: ["MappoCore", .product(name: "SQLite", package: "SQLite.swift"), .product(name: "JSONValueRX", package: "JSONValue"), .product(name: "AsyncHTTPClient", package: "async-http-client"), .product(name: "AsyncKit", package: "async-kit")]),
+        // .executableTarget(
+        //     name: "Mapptrix",
+        //     dependencies: ["MappoCore", .product(name: "SQLite", package: "SQLite.swift"), .product(name: "JSONValueRX", package: "JSONValue"), .product(name: "AsyncHTTPClient", package: "async-http-client"), .product(name: "AsyncKit", package: "async-kit")]),
         .testTarget(
             name: "MappoTests",
             dependencies: ["Mappo"]),

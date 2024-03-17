@@ -2,6 +2,7 @@ import NIO
 import OrderedCollections
 import Foundation
 import Logging
+import Dispatch
 
 public class ConditionVariable {
 	let promise: EventLoopPromise<Void>
@@ -227,7 +228,8 @@ public enum Team: Equatable {
 }
 
 public enum GameState {
-	case waiting
+	case idle
+	case joining
 	case assigned
 	case playing
 }
@@ -356,6 +358,7 @@ public enum ButtonID: String {
 	case nominateSkip = "skip"
 	case voteYes = "yes"
 	case voteNo = "no"
+	case joinGame = "join-game"
 }
 
 public enum DetectiveLocations: String {
@@ -371,6 +374,7 @@ public protocol Sendable {
 
 	func send(_ text: String) async throws -> Message
 	func send(_ embed: CommunicationEmbed) async throws -> Message
+	func send(_ embed: CommunicationEmbed, _ buttons: [CommunicationButton]) async throws -> Message
 	func send(_ buttons: [CommunicationButton]) async throws -> Message
 	func send(userSelection options: [UserID], id: SingleUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
 	func send(multiUserSelection options: [UserID], id: MultiUserSelectionID, label: String, buttons: [CommunicationButton]) async throws -> Message
@@ -416,6 +420,31 @@ public protocol Replyable {
 
 public protocol Mentionable {
 	func mention() -> String
+}
+
+public enum Waits {
+	case nightTime
+	case dayStart
+	case dayEnding
+	case nominationsStart
+	case nominationsEnding
+
+	var durationSeconds: Int {
+		switch self {
+		case .nightTime: 40
+		case .dayStart: 60
+		case .dayEnding: 30
+		case .nominationsStart: 20
+		case .nominationsEnding: 20
+		}
+	}
+	var durationNanoseconds: UInt64 {
+		UInt64(durationSeconds * 1_000_000_000)
+	}
+
+	func sleep() async throws {
+		try await Task.sleep(nanoseconds: durationNanoseconds)
+	}
 }
 
 public protocol Communication {
@@ -538,17 +567,13 @@ public class State<Comm: Communication> {
 	// who's alive?
 	var alive: [Comm.UserID: Bool] = [:]
 
-	var state: GameState = .waiting
+	var state: GameState = .idle
 
 	var timeOfYear: TimeOfYear
 
 	var year: Int
 
 	var day: Int
-
-	var joinQueue: Set<Comm.UserID> = []
-
-	var leaveQueue: Set<Comm.UserID> = []
 
 	var comm: Comm
 
@@ -597,6 +622,35 @@ public class State<Comm: Communication> {
 		day += 1
 	}
 
+	var timer: Task<Void, Error>? = nil
+	func resetStartTimer() {
+		if let extant = timer {
+			extant.cancel()
+		}
+
+		timer = Task {
+			try await Task.sleep(nanoseconds: 25_000_000_000)
+			try await self.startTimerExpired()
+			self.timer = nil
+		}
+	}
+
+	func startTimerExpired() async throws {
+		guard party.count >= 4 else {
+			state = .idle
+			try await resetParty()
+			clear()
+			try await channel.send(i18n.atLeastFourPeopleNeeded)
+			return
+		}
+		try await channel.send(i18n.assigningRoles)
+		try await assignRoles()
+		try await channel.send(i18n.readRoles)
+		try await Task.sleep(nanoseconds: 20_000_000_000)
+		try await channel.send(i18n.gameStarting)
+		try await startPlaying()
+	}
+
 	func assignRoles() async throws {
 		clear()
 
@@ -611,7 +665,7 @@ public class State<Comm: Communication> {
 		}
 
 		guard let shuffledRoles = Role.generateRoles(partySize: party.count) else {
-			state = .waiting
+			state = .idle
 
 			_ = try await channel.send("Failed to shuffle a balanced party, please reroll! If this happens too often, contact Janet.")
 
@@ -656,38 +710,16 @@ public class State<Comm: Communication> {
 			}
 			.joined(separator: "\n")
 		_ = try await channel.send(CommunicationEmbed(title: i18n.victoryTitle(reason), body: txt))
-
-		let incoming = joinQueue.map { "\($0.mention())" }.joined(separator: "\n")
-		let outgoing = leaveQueue.map { "\($0.mention())" }.joined(separator: "\n")
-		for user in joinQueue {
-			party.append(user)
-			try await comm.onJoined(user, state: self)
-		}
-		for user in leaveQueue {
-			party.remove(user)
-			try await comm.onLeft(user, state: self)
-		}
-		if joinQueue.count > 0 {
-			_ = try await channel.send(
-				CommunicationEmbed(title: i18n.peopleJoinedParty, body: incoming, color: .good)
-			)
-		}
-		if leaveQueue.count > 0 {
-			_ = try await channel.send(
-				CommunicationEmbed(title: i18n.peopleLeftParty, body: outgoing, color: .bad)
-			)
-		}
-		joinQueue = []
-		leaveQueue = []
+		try await resetParty()
 	}
 
 	func playNight() async throws {
-		_ = try await thread?.send(i18n.nightHasFallen)
+		_ = try await thread?.send(i18n.nightHasFallen(seconds: Waits.nightTime.durationSeconds))
 
 		// night actions
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.nightTitle(timeOfYear, year: year, day: day)))
 		try await startNight()
-		try await Task.sleep(nanoseconds: 35_000_000_000)
+		try await Waits.nightTime.sleep()
 
 		// finish up night actions
 		try await endNight()
@@ -697,31 +729,31 @@ public class State<Comm: Communication> {
 
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.morningTitle(timeOfYear, year: year, day: day)))
 		_ = try await thread?.send(i18n.villagersGather)
-		_ = try await thread?.send(i18n.itIsDaytime)
+		_ = try await thread?.send(i18n.itIsDaytime(seconds: Waits.dayStart.durationSeconds + Waits.dayEnding.durationSeconds))
 
-		try await Task.sleep(nanoseconds: 30_000_000_000)
+		try await Waits.dayStart.sleep()
 
-		_ = try await thread?.send(i18n.dayTimeRunningOut)
+		_ = try await thread?.send(i18n.dayTimeRunningOut(seconds: Waits.dayEnding.durationSeconds))
 
-		try await Task.sleep(nanoseconds: 30_000_000_000)
+		try await Waits.dayEnding.sleep()
 
 		resetVotes()
-		_ = try await thread?.send(i18n.eveningDraws)
+		_ = try await thread?.send(i18n.eveningDraws(seconds: Waits.nominationsStart.durationSeconds + Waits.nominationsEnding.durationSeconds))
 		_ = try await thread?.send(
 			multiUserSelection: party.filter { alive[$0]! },
 			id: .nominate,
 			label: i18n.nominationTitle
 		)
 
-		try await Task.sleep(nanoseconds: 15_000_000_000)
+		try await Waits.nominationsStart.sleep()
 
 		_ = try await thread?.send(
 			multiUserSelection: party.filter { alive[$0]! },
 			id: .nominate,
-			label: i18n.nominationEndingSoonTitle
+			label: i18n.nominationEndingSoonTitle(seconds: Waits.nominationsEnding.durationSeconds)
 		)
 
-		try await Task.sleep(nanoseconds: 15_000_000_000)
+		try await Waits.nominationsEnding.sleep()
 
 		let allVotes = votes.flatMap { $0.value }
 		let votedPlayers = Dictionary(allVotes.map { key in (key, allVotes.filter { $0 == key }.count) }, uniquingKeysWith: { a, _ in a })
@@ -1226,7 +1258,7 @@ public class State<Comm: Communication> {
 
 		_ = try await thread?.send(i18n.victory(reason))
 
-		state = .waiting
+		state = .idle
 		let txt = party
 			.map { item -> String in
 				let role = roles[item]!
@@ -1243,8 +1275,6 @@ public class State<Comm: Communication> {
 	public let arglessCommands = [
 		"join": join,
 		"leave": leave,
-		"setup": setup,
-		"unsetup": unsetup,
 		"party": party,
 		"start": start,
 		"roles": sendRoles,
@@ -1254,29 +1284,52 @@ public class State<Comm: Communication> {
 		"remove": remove,
 	]
 	public let stringCommands = [
-		"language": language,
 		"role": role,
+		"create": create,
 	]
 
-	// command implementations
-	func join(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard state == .waiting || state == .assigned else {
-			if leaveQueue.contains(who) {
-				_ = try await interaction.reply(with: i18n.leaveLeaveQueue, epheremal: true)
-			} else {
-				guard !party.contains(who) else {
-					_ = try await interaction.reply(with: i18n.alreadyInParty, epheremal: true)
-					return
-				}
-				guard try await comm.currentParty(of: who, state: self) == nil else {
-					_ = try await interaction.reply(with: i18n.alreadyInAnotherParty, epheremal: true)
-					return
-				}
+	func resetParty() async throws {
+		for item in party {
+			try await comm.onLeft(item, state: self)
+		}
+		party = OrderedSet()
+	}
 
-				joinQueue.insert(who)
-				try await comm.onPrepareJoined(who, state: self)
-				_ = try await interaction.reply(with: i18n.addedJoinQueue, epheremal: true)
-			}
+	// command implementations
+	func create(who: Comm.UserID, language: String, interaction: Comm.Interaction) async throws {
+		guard state == .idle else {
+			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
+			return
+		}
+
+		switch language {
+		case "toki_pona":
+			i18n = TokiPona()
+		case "english":
+			i18n = English()
+		default:
+			break
+		}
+
+		try await resetParty()
+
+		try await comm.onPrepareJoined(who, state: self)
+		try await comm.onJoined(who, state: self)
+		party.append(who)
+
+		state = .joining
+
+		try await interaction.reply(with: i18n.gameCreated, epheremal: false)
+		resetStartTimer()
+		_ = try await channel.send(
+			CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "\($0.mention())" }.joined(separator: "\n")),
+			[.init(id: .joinGame, label: i18n.joinGame)]
+		)
+	}
+
+	func join(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard state == .joining else {
+			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
 			return
 		}
 		guard !party.contains(who) else {
@@ -1290,21 +1343,16 @@ public class State<Comm: Communication> {
 		try await comm.onPrepareJoined(who, state: self)
 		try await comm.onJoined(who, state: self)
 		party.append(who)
-		_ = try await interaction.reply(with: i18n.joinedParty, epheremal: false)
-		if state == .assigned {
-			state = .waiting
-			_ = try await interaction.reply(with: i18n.setupRequired, epheremal: true)
-		}
+		_ = try await interaction.reply(with: i18n.joinedParty(who: who), epheremal: false)
+		resetStartTimer()
+		_ = try await channel.send(
+			CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "\($0.mention())" }.joined(separator: "\n")),
+			[.init(id: .joinGame, label: i18n.joinGame)]
+		)
 	}
 	func leave(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard state == .waiting else {
-			if joinQueue.contains(who) {
-				joinQueue.remove(who)
-				_ = try await interaction.reply(with: i18n.leaveJoinQueue, epheremal: true)
-			} else {
-				leaveQueue.insert(who)
-				_ = try await interaction.reply(with: i18n.addedLeaveQueue, epheremal: true)
-			}
+		guard state == .joining else {
+			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
 			return
 		}
 		guard party.contains(who) else {
@@ -1314,31 +1362,11 @@ public class State<Comm: Communication> {
 		try await comm.onLeft(who, state: self)
 		party.remove(who)
 		try await interaction.reply(with: i18n.leftParty, epheremal: false)
-	}
-	func setup(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard who == party.first else {
-			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
-			return
-		}
-		guard state == .waiting || state == .assigned else {
-			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: false)
-			return
-		}
-		guard party.count >= 4 else {
-			try await interaction.reply(with: i18n.atLeastFourPeopleNeeded, epheremal: false)
-			return
-		}
-		try await assignRoles()
-		try await interaction.reply(with: i18n.gameHasBeenSetUp, epheremal: false)
-	}
-	func unsetup(who: Comm.UserID, interaction: Comm.Interaction) async throws {
-		guard state == .assigned else {
-			try await interaction.reply(with: i18n.lobbyNotInRightState, epheremal: true)
-			return
-		}
-
-		state = .waiting
-		try await interaction.reply(with: i18n.gameHasBeenUnSetUp, epheremal: false)
+		resetStartTimer()
+		_ = try await channel.send(
+			CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "\($0.mention())" }.joined(separator: "\n")),
+			[.init(id: .joinGame, label: i18n.joinGame)]
+		)
 	}
 	func party(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		_ = try await interaction.reply(
@@ -1379,16 +1407,8 @@ public class State<Comm: Communication> {
 			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
 			return
 		}
-		guard state == .waiting else {
-			if joinQueue.contains(target) {
-				joinQueue.remove(target)
-				_ = try await interaction.reply(with: i18n.leaveJoinQueue, epheremal: true)
-			} else if party.contains(target) {
-				leaveQueue.insert(target)
-				_ = try await interaction.reply(with: i18n.addedLeaveQueue, epheremal: true)
-			} else {
-				try await interaction.reply(with: i18n.targetNotInParty, epheremal: true)
-			}
+		guard state == .joining else {
+			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
 			return
 		}
 		guard party.contains(target) else {
@@ -1398,22 +1418,6 @@ public class State<Comm: Communication> {
 		try await comm.onLeft(target, state: self)
 		party.remove(target)
 		try await interaction.reply(with: i18n.hasBeenRemoved(target), epheremal: false)
-	}
-	func language(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
-		guard who == party.first else {
-			try await interaction.reply(with: i18n.mustBePartyLeader, epheremal: true)
-			return
-		}
-		switch what {
-		case "toki pona", "tpo", "tok", "toki", "pona", "tokipona":
-			i18n = TokiPona()
-			try await interaction.reply(with: "toki musi li toki pona!", epheremal: true)
-		case "english", "en":
-			i18n = English()
-			try await interaction.reply(with: "The game language is English!", epheremal: true)
-		default:
-			try await interaction.reply(with: "I don't know that language!", epheremal: true)
-		}
 	}
 	func role(who: Comm.UserID, what: String, interaction: Comm.Interaction) async throws {
 		guard let role = Role.allCases.filter({ role in
@@ -1559,5 +1563,7 @@ public class State<Comm: Communication> {
 		}
 	}
 
-	public let buttons: [ButtonID: (State<Comm>) -> (Comm.UserID, Comm.Interaction) async throws -> ()] = [:]
+	public let buttons: [ButtonID: (State<Comm>) -> (Comm.UserID, Comm.Interaction) async throws -> ()] = [
+		.joinGame: join,
+	]
 }

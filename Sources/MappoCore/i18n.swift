@@ -123,18 +123,16 @@ public protocol I18n {
     var killFailure: String { get }
     var killProtected: String { get }
     var killAwayFromHome: String { get }
-    var peopleJoinedParty: String { get }
-    var peopleLeftParty: String { get }
-    var nightHasFallen: String { get }
+    func nightHasFallen(seconds: Int) -> String
     var villagersGather: String { get }
-    var itIsDaytime: String { get }
-    var dayTimeRunningOut: String { get }
-    var eveningDraws: String { get }
+    func itIsDaytime(seconds: Int) -> String
+    func dayTimeRunningOut(seconds: Int) -> String
+    func eveningDraws(seconds: Int) -> String
     var nominateSkip: String { get }
     var duskDrawsSkip: String { get }
     var duskDrawsVoting: String { get }
     var nominationTitle: String { get }
-    var nominationEndingSoonTitle: String { get }
+    func nominationEndingSoonTitle(seconds: Int) -> String
     var voteYes: String { get }
     var voteNo: String { get }
     var timeToBed: String { get }
@@ -164,14 +162,10 @@ public protocol I18n {
     var drProtect: String { get }
     var drInnocent: String { get }
     var drGoose: String { get }
-    var leaveLeaveQueue: String { get }
-    var addedJoinQueue: String { get }
     var alreadyInParty: String { get }
     var alreadyInAnotherParty: String { get }
-    var joinedParty: String { get }
+    func joinedParty(who: Mentionable) -> String
     var setupRequired: String { get }
-    var leaveJoinQueue: String { get }
-    var addedLeaveQueue: String { get }
     var notInParty: String { get }
     var leftParty: String { get }
     var nobodyVoted: String { get }
@@ -179,10 +173,7 @@ public protocol I18n {
     var mustBePartyLeader: String { get }
     var gameAlreadyInProgress: String { get }
     var atLeastFourPeopleNeeded: String { get }
-    var gameHasBeenSetUp: String { get }
     var lobbyNotInRightState: String { get }
-    var gameHasBeenUnSetUp: String { get }
-    var mustSetUpBeforeStarting: String { get }
     var gameHasBeenStarted: String { get }
     var targetNotInParty: String { get }
     var headerMinimumPlayerCount: String { get }
@@ -195,6 +186,11 @@ public protocol I18n {
     var bartenderAction: String { get }
     var bartenderPrompt: String { get }
     var inebriatedFailureDM: String { get }
+    var gameCreated: String { get }
+    var joinGame: String { get }
+    var assigningRoles: String { get }
+    var readRoles: String { get }
+    var gameStarting: String { get }
 }
 
 public struct English: I18n {
@@ -303,15 +299,15 @@ public struct English: I18n {
     public let killAwayFromHome = "... but they were away from home!"
     public let peopleJoinedParty = "Some people have joined the party!"
     public let peopleLeftParty = "Some people have left the party!"
-    public var nightHasFallen: String {
+    public func nightHasFallen(seconds: Int) -> String {
         [
-            "Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have 35 seconds to use your actions!",
-            "Darkness prevails as everyone retires for the day. The fatigue is palpable. Players of the night, you hold a time slot of 35 seconds to wield your actions!",
-            "The shroud of night descends. Our brave participants retreat to slumber, tired from the day's exploits. Tis time for the night players to shine, you've got 35 seconds to execute your moves!",
-            "As the veil of night drops, all are off to their chambers, exhausted from today's trials. Players thriving in midnight's ascendance, your 35-second countdown to act commences now!",
-            "The day is done and darkness is upon us. Everyone surrenders to fatigue and retreats for some rest. But for night players, you have a window of 35 seconds to demonstrate your skills!",
-            "Nightfall has arrived and all weary souls retreat to their beds. Night agents, the spotlight is yours - you have 35 brief seconds to strategize and act!",
-            "The canvas of black stretches across the sky, and restless heads hit pillows. All eyes are on you night players - you're on a 35-second ticking clock to make your move!",
+            "Night has fallen. Everyone heads to bed, weary after another stressful day. Night players: you have \(seconds) seconds to use your actions!",
+            "Darkness prevails as everyone retires for the day. The fatigue is palpable. Players of the night, you hold a time slot of \(seconds) seconds to wield your actions!",
+            "The shroud of night descends. Our brave participants retreat to slumber, tired from the day's exploits. Tis time for the night players to shine, you've got \(seconds) seconds to execute your moves!",
+            "As the veil of night drops, all are off to their chambers, exhausted from today's trials. Players thriving in midnight's ascendance, your \(seconds)-second countdown to act commences now!",
+            "The day is done and darkness is upon us. Everyone surrenders to fatigue and retreats for some rest. But for night players, you have a window of \(seconds) seconds to demonstrate your skills!",
+            "Nightfall has arrived and all weary souls retreat to their beds. Night agents, the spotlight is yours - you have \(seconds) brief seconds to strategize and act!",
+            "The canvas of black stretches across the sky, and restless heads hit pillows. All eyes are on you night players - you're on a \(seconds)-second ticking clock to make your move!",
         ].randomElement()!
     }
     public var villagersGather: String {
@@ -323,25 +319,31 @@ public struct English: I18n {
           "The villagers gather the next morning in the village center.",
         ].randomElement()!
     }
-    public var itIsDaytime: String {
+    public func itIsDaytime(seconds: Int) -> String {
         [
-            "It is now day time. All of you have 60 seconds to make your accusations, defenses, claim roles, or just talk.",
+            "It is now day time. All of you have \(seconds) seconds to make your accusations, defenses, claim roles, or just talk.",
             "It's now daytime. You all have a minute to make any accusations, defenses, claim your roles, or just converse.",
-            "The day has begun. You each have 60 seconds to voice your accusations, establish your defenses, claim roles, or engage in conversation.",
-            "Daylight is here. There's 60 seconds for everyone to accuse, defend, declare roles, or just chat.",
+            "The day has begun. You each have \(seconds) seconds to voice your accusations, establish your defenses, claim roles, or engage in conversation.",
+            "Daylight is here. There's \(seconds) seconds for everyone to accuse, defend, declare roles, or just chat.",
             "It's day break time. You've all got a minute for accusations, defenses, role-claims or just plain conversation.",
-            "The sun is up. A 60-second window has begun for you to make any accusations or defenses, state your roles, or simply discuss.",
-            "Now begins the day. Each one of you has a span of 60 seconds to present accusations, make defenses, declare roles, or just have casual talk.",
+            "The sun is up. A \(seconds)-second window has begun for you to make any accusations or defenses, state your roles, or simply discuss.",
+            "Now begins the day. Each one of you has a span of \(seconds) seconds to present accusations, make defenses, declare roles, or just have casual talk.",
             "Day has dawned. Everyone has one minute to accuse, defend, present roles, or go for a general chat."
         ].randomElement()!
     }
-    public let dayTimeRunningOut = "It is the afternoon; you have 30 seconds remaining before voting begins."
-    public let eveningDraws = "Evening draws near, and it's now possible to nominate people (or skip). We will proceed in 30 seconds."
+    public func dayTimeRunningOut(seconds: Int) -> String {
+        "It is the afternoon; you have \(seconds) seconds remaining before voting begins."
+    }
+    public func eveningDraws(seconds: Int) -> String {
+        "Evening draws near, and it's now possible to nominate people (or skip). We will proceed in \(seconds) seconds."
+    }
     public let nominateSkip = "Skip Nominations"
     public let duskDrawsSkip = "The people have decided to skip voting tonight."
     public let duskDrawsVoting = "It's getting dark... let's go through the nominations!"
     public let nominationTitle = "Nominate people (or don't!)"
-    public let nominationEndingSoonTitle = "15 seconds remain!"
+    public func nominationEndingSoonTitle(seconds: Int) -> String {
+        "\(seconds) seconds remain!"
+    }
     public let voteYes = "Yes"
     public let voteNo = "No"
     public let timeToBed = "Dusk draws near, and it's time to get to bed... A little more discussion time (25 seconds) for you before that, though!"
@@ -373,7 +375,9 @@ public struct English: I18n {
     public let addedJoinQueue = "You have been added to the join queue! You will join when the current game is over"
     public let alreadyInParty = "You're already in the party!"
     public let alreadyInAnotherParty = "You're in another party!"
-    public let joinedParty = "You have joined the party!"
+    public func joinedParty(who: Mentionable) -> String {
+        "\(who.mention()) has joined the party!"
+    }
     public let setupRequired = "You need to setup again, since a new player joined"
     public let leaveJoinQueue = "You have left the leave queue"
     public let addedLeaveQueue = "You have been added to the leave queue! You will leave when the current game is over"
@@ -400,6 +404,11 @@ public struct English: I18n {
     public let bartenderAction = "Time to visit someone's house and give them drinks!"
     public let bartenderPrompt = "Pick someone to visit tonight."
     public let inebriatedFailureDM = "*hic*, you couldn't do anything *hic* tonight because you were *hic* drunk"
+    public let gameCreated = "A game has been created! Everyone else, come join on in!"
+    public let joinGame = "Join Game"
+    public let assigningRoles = "Assigning roles..."
+    public let readRoles = "Read the roles!"
+    public let gameStarting = "The game is starting!"
 
     public init()
     {
@@ -732,18 +741,30 @@ public struct TokiPona: I18n {
     public let killFailure = "... ona li moli ala e ona."
     public let killProtected = "... jan awen sewi li awen e ona!"
     public let killAwayFromHome = "... taso ona li weka tan tomo ona!"
-    public let peopleJoinedParty = "jan li kama tawa kulupu!"
+    public func joinedParty(who: Mentionable) -> String {
+        "\(who.mention()) li kama kulupu a!"
+    }
     public let peopleLeftParty = "jan li weka tan kulupu!"
-    public let nightHasFallen = "tenpo pimeja li kama. jan ale li tawa supa lape li pilin pi wawa ala. jan musi pi tenpo pimeja o, pali lon tenpo pimeja ni a!"
+    public func nightHasFallen(seconds: Int) -> String {
+        "tenpo pimeja li kama. jan ale li tawa supa lape li pilin pi wawa ala. jan musi pi tenpo pimeja o, pali lon tenpo pimeja ni a!"
+    }
     public let villagersGather = "tenpo suno la, jan li kama lon tomo toki."
-    public let itIsDaytime = "sina ale li jo e tenpo lili tawa ni: toki utala, toki awen, toki pi pali sina, anu toki pona."
-    public let dayTimeRunningOut = "tenpo li kama lili a! tenpo kama pi weka lili la utala pi wile weka li open."
-    public let eveningDraws = "tenpo pimeja li kama la, sina ken open weka e jan. tenpo li tawa la, sina ken alasa weka e jan."
+    public func itIsDaytime(seconds: Int) -> String {
+        "sina ale li jo e tenpo lili tawa ni: toki utala, toki awen, toki pi pali sina, anu toki pona."
+    }
+    public func dayTimeRunningOut(seconds: Int) -> String {
+        "tenpo li kama lili a! tenpo kama pi weka lili la utala pi wile weka li open."
+    }
+    public func eveningDraws(seconds: Int) -> String {
+        "tenpo pimeja li kama la, sina ken open weka e jan. tenpo li tawa la, sina ken alasa weka e jan."
+    }
     public let nominateSkip = "alasa ala weka"
     public let duskDrawsSkip = "kulupu li wile ala alasa weka."
     public let duskDrawsVoting = "tenpo mun li kama la, mi o open alasa weka a!"
     public let nominationTitle = "o alasa weka e jan!"
-    public let nominationEndingSoonTitle = "o alasa weka e jan! tenpo weka li kama pini!"
+    public func nominationEndingSoonTitle(seconds: Int) -> String {
+        "o alasa weka e jan! tenpo weka li kama pini!"
+    }
     public let voteYes = "wile"
     public let voteNo = "wile ala"
     public let timeToBed = "tenpo pimeja en tenpo lape li kama... taso, sina ken awen toki lon tenpo lili!"
@@ -802,6 +823,11 @@ public struct TokiPona: I18n {
     public let bartenderAction = "o tawa tomo a! sina pana e telo nasa sina tawa kulupu ona."
     public let bartenderPrompt = "sina wile tawa e tomo seme?"
     public let inebriatedFailureDM = "*a*, sina ken ala pali *a* lon mun tan ni: sina *a* nasa tan telo *a*"
+    public let gameCreated = "musi li kama lon a! ale kulupu o, kama tawa musi ni a!"
+    public let joinGame = "o kama musi a!"
+    public let assigningRoles = "mi pana e pali..."
+    public let readRoles = "o lukin e pali a!"
+    public let gameStarting = "musi li open a!"
 
     public init()
     {

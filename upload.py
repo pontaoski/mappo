@@ -11,12 +11,19 @@ with open('config.json') as f:
 url = f"https://discord.com/api/v10/applications/{k['appID']}/commands"
 
 commands = [
+    {"type":1, "options":[{
+        "name": "language",
+        "description": "The game language",
+        "required": True,
+        "type": 3,
+        "choices": [
+            { "name": "Toki Pona", "value": "toki_pona" },
+            { "name": "English", "value": "english" },
+        ],
+    }],"description":"Creates a new game","default_permission":True,"name":"create"},
     {"type":1,"options":[],"description":"Join a lobby","default_permission":True,"name":"join"},
     {"type":1,"options":[],"description":"Leave a lobby","default_permission":True,"name":"leave"},
     {"type":1,"options":[],"description":"View the current party","default_permission":True,"name":"party"},
-    {"type":1,"options":[],"description":"Set up a game, making it ready to play","default_permission":True,"name":"setup"},
-    {"type":1,"options":[],"description":"Un-set up a game, making it not ready to play, allowing people to leave","default_permission":True,"name":"unsetup"},
-    {"type":1,"options":[],"description":"Start a game","default_permission":True,"name":"start"},
     {"type":1,"options":[],"description":"Lists all roles","default_permission":True,"name":"roles"},
     {"type":1,"options":[{
         "name": "role",
@@ -36,19 +43,17 @@ commands = [
         "required": True,
         "type": 6,
     }],"description":"Promotes a user to party leader","default_permission":True,"name":"promote"},
-    {"type":1,"options":[{
-        "name": "language",
-        "description": "The language to set the game",
-        "required": True,
-        "type": 3,
-    }],"description":"Changes the game language","default_permission":True,"name":"language"},
 ]
 
 headers = {
     "Authorization": f"Bot {k['token']}",
 }
 
-for cmd in commands:
-    resp = requests.post(url, headers=headers, json=cmd)
+resp = requests.put(url, headers=headers, json=commands)
+print(resp)
+sleep(4.5)
+
+for cmd in ["1013538476844658799", "1013538497132498945", "1013538517881720832"]:
+    resp = requests.delete(url + "/" + cmd, headers=headers)
     print(resp)
     sleep(4.5)

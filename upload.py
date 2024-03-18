@@ -20,6 +20,16 @@ commands = [
             { "name": "Toki Pona", "value": "toki_pona" },
             { "name": "English", "value": "english" },
         ],
+    },{
+        "name": "speed",
+        "description": "The game speed",
+        "required": False,
+        "type": 3,
+        "choices": [
+            { "name": "Fast", "value": "fast" },
+            { "name": "Normal", "value": "normal" },
+            { "name": "Manual", "value": "manual" },
+        ],
     }],"description":"Creates a new game","default_permission":True,"name":"create"},
     {"type":1,"options":[],"description":"Join a lobby","default_permission":True,"name":"join"},
     {"type":1,"options":[],"description":"Leave a lobby","default_permission":True,"name":"leave"},

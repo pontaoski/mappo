@@ -205,6 +205,8 @@ final class DiscordCommunication: Communication {
 	let cache: DiscordCache
 	let ccache: CustomCache
 	let gs: GlobalState
+	let threads: [UserList<DiscordCommunication>: DiscordChannel] = [:]
+
 	init(client: any DiscordClient, cache: DiscordCache, ccache: CustomCache, state: GlobalState) {
 		self.client = client
 		self.cache = cache
@@ -221,6 +223,18 @@ final class DiscordCommunication: Communication {
 		let thread = try await client.createThread(channelId: state.channel.channelID, payload: .init(name: "Mappo", type: .privateThread))
 		let threadO = try thread.decode()
 		return DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: threadO.guild_id!, channelID: threadO.id)
+	}
+	func createTalkThread(state: DiscordState, users: UserList<DiscordCommunication>) async throws -> Channel? {
+		let items = UserList<DiscordCommunication>(users: users.users.sorted(by: {$0.rawValue < $1.rawValue}))
+
+		if let thread = threads[items] {
+			_ = try await client.updateThreadChannel(id: thread.channelID, reason: nil, payload: .init(archived: false, locked: false))
+			return thread
+		} else {
+			let thread = try await client.createThread(channelId: state.channel.channelID, payload: .init(name: "Talk Thread", type: .privateThread))
+			let threadO = try thread.decode()
+			return DiscordChannel(client: client, cache: cache, ccache: ccache, guildID: threadO.guild_id!, channelID: threadO.id)
+		}
 	}
 	func archive(_ id: Channel, state: DiscordState) async throws {
 		_ = try await client.updateThreadChannel(id: id.channelID, reason: nil, payload: .init(archived: true, locked: true))
@@ -353,6 +367,29 @@ class MyBot {
 				return
 			}
 			try await command(state)(user.id, UserSnowflake(val), intr)
+		} else if cmd == "create" {
+			guard let opt = opts, let first = opt.first, let val = first.value?.asString else {
+				try await intr.reply(with: "Oops, I had an error (Discord didn't send me an option...?)", epheremal: true)
+				return
+			}
+			let language: GameLanguage = switch val {
+			case "toki_pona": .tokiPona
+			default: .english
+			}
+			let speed: GameSpeed = switch opt.first(where: {$0.name == "speed"}) {
+			case nil: .normal
+			case .some(let it):
+				if let val = it.value?.asString {
+					switch val {
+					case "fast": GameSpeed.fast
+					case "manual": GameSpeed.infinite
+					default: GameSpeed.normal
+					}
+				} else {
+					GameSpeed.normal
+				}
+			}
+			try await state.createCommand(state)(user.id, language, speed, intr)
 		} else {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(cmd)). Sorry.", epheremal: true)
 		}

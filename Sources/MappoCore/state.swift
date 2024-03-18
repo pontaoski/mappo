@@ -3,6 +3,7 @@ import OrderedCollections
 import Foundation
 import Logging
 import Dispatch
+import Algorithms
 
 public class ConditionVariable {
 	let promise: EventLoopPromise<Void>
@@ -422,24 +423,49 @@ public protocol Mentionable {
 	func mention() -> String
 }
 
+public enum GameLanguage {
+	case english
+	case tokiPona
+}
+
+public enum GameSpeed {
+	case fast
+	case normal
+	case infinite
+}
+
 public enum Waits {
 	case nightTime
 	case dayStart
 	case dayEnding
 	case nominationsStart
 	case nominationsEnding
+	case waitingToJoin
+	case waitingToReadRoles
 
-	var durationSeconds: Int {
+	private var durationSeconds: Int {
 		switch self {
 		case .nightTime: 40
 		case .dayStart: 60
 		case .dayEnding: 30
 		case .nominationsStart: 20
 		case .nominationsEnding: 20
+		case .waitingToJoin: 25
+		case .waitingToReadRoles: 15
 		}
 	}
-	var durationNanoseconds: UInt64 {
-		UInt64(durationSeconds * 1_000_000_000)
+	func durationSeconds(_ speed: GameSpeed) -> Int {
+		switch speed {
+		case .fast:
+			return (durationSeconds * 3) / 4
+		case .normal:
+			return durationSeconds
+		case .infinite:
+			return 60*10
+		}
+	}
+	func durationNanoseconds(_ speed: GameSpeed) -> UInt64 {
+		return UInt64(durationSeconds(speed)) * 1_000_000_000
 	}
 }
 
@@ -451,11 +477,20 @@ public protocol Communication {
 
 	func getChannel(for: UserID, state: State<Self>) async throws -> Channel?
 	func createGameThread(state: State<Self>) async throws -> Channel?
+	func createTalkThread(state: State<Self>, users: UserList<Self>) async throws -> Channel?
 	func archive(_: Channel, state: State<Self>) async throws
 	func currentParty(of user: UserID, state: State<Self>) async throws -> State<Self>?
 	func onPrepareJoined(_ user: UserID, state: State<Self>) async throws
 	func onJoined(_: UserID, state: State<Self>) async throws
 	func onLeft(_: UserID, state: State<Self>) async throws
+}
+
+public struct UserList<Comm: Communication>: Hashable {
+	public let users: [Comm.UserID]
+
+	public init(users: [Comm.UserID]) {
+		self.users = users
+	}
 }
 
 public class State<Comm: Communication> {
@@ -542,6 +577,8 @@ public class State<Comm: Communication> {
 	// what thread are we playing in?
 	var thread: Comm.Channel?
 
+	var threads: [UserList<Comm>: Comm.Channel] = [:]
+
 	// who's playing?
 	var party: OrderedSet<Comm.UserID> = []
 
@@ -579,6 +616,8 @@ public class State<Comm: Communication> {
 
 	var i18n: I18n
 
+	var speed: GameSpeed
+
 	let logger = Logger(label: "cc.blackquill.Mappo")
 
 	public init(for channel: Comm.Channel, in comm: Comm, eventLoop: EventLoop) {
@@ -590,6 +629,7 @@ public class State<Comm: Communication> {
 		self.eventLoop = eventLoop
 		self.votes = [:]
 		self.i18n = channel.i18n()
+		self.speed = .normal
 	}
 
 	func resetVotes() {
@@ -625,7 +665,7 @@ public class State<Comm: Communication> {
 		}
 
 		timer = Task {
-			try await Task.sleep(nanoseconds: 25_000_000_000)
+			try await waitFor(.waitingToJoin)
 			try await self.startTimerExpired()
 			self.timer = nil
 		}
@@ -634,7 +674,7 @@ public class State<Comm: Communication> {
 	var currentPause: Task<Void, Error>? = nil
 	func waitFor(_ wait: Waits) async throws {
 		currentPause = Task {
-			try await Task.sleep(nanoseconds: wait.durationNanoseconds)
+			try await Task.sleep(nanoseconds: wait.durationNanoseconds(speed))
 		}
 		let _ = await currentPause?.result
 	}
@@ -646,7 +686,7 @@ public class State<Comm: Communication> {
 	}
 
 	func startTimerExpired() async throws {
-		guard party.count >= 4 else {
+		guard party.count >= 3 else {
 			state = .idle
 			try await resetParty()
 			clear()
@@ -656,7 +696,7 @@ public class State<Comm: Communication> {
 		try await channel.send(i18n.assigningRoles)
 		try await assignRoles()
 		try await channel.send(i18n.readRoles)
-		try await Task.sleep(nanoseconds: 20_000_000_000)
+		try await waitFor(.waitingToReadRoles)
 		try await channel.send(i18n.gameStarting)
 		try await startPlaying()
 	}
@@ -710,6 +750,9 @@ public class State<Comm: Communication> {
 		if let thread = thread {
 			_ = try await comm.archive(thread, state: self)
 		}
+		for thread in threads {
+			_ = try await comm.archive(thread.value, state: self)
+		}
 
 		let txt = party
 			.map { item -> String in
@@ -724,7 +767,7 @@ public class State<Comm: Communication> {
 	}
 
 	func playNight() async throws {
-		_ = try await thread?.send(i18n.nightHasFallen(seconds: Waits.nightTime.durationSeconds))
+		_ = try await thread?.send(i18n.nightHasFallen(seconds: Waits.nightTime.durationSeconds(speed)))
 
 		// night actions
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.nightTitle(timeOfYear, year: year, day: day)))
@@ -739,16 +782,16 @@ public class State<Comm: Communication> {
 
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.morningTitle(timeOfYear, year: year, day: day)))
 		_ = try await thread?.send(i18n.villagersGather)
-		_ = try await thread?.send(i18n.itIsDaytime(seconds: Waits.dayStart.durationSeconds + Waits.dayEnding.durationSeconds))
+		_ = try await thread?.send(i18n.itIsDaytime(seconds: Waits.dayStart.durationSeconds(speed) + Waits.dayEnding.durationSeconds(speed)))
 
 		try await waitFor(Waits.dayStart)
 
-		_ = try await thread?.send(i18n.dayTimeRunningOut(seconds: Waits.dayEnding.durationSeconds))
+		_ = try await thread?.send(i18n.dayTimeRunningOut(seconds: Waits.dayEnding.durationSeconds(speed)))
 
 		try await waitFor(Waits.dayEnding)
 
 		resetVotes()
-		_ = try await thread?.send(i18n.eveningDraws(seconds: Waits.nominationsStart.durationSeconds + Waits.nominationsEnding.durationSeconds))
+		_ = try await thread?.send(i18n.eveningDraws(seconds: Waits.nominationsStart.durationSeconds(speed) + Waits.nominationsEnding.durationSeconds(speed)))
 		_ = try await thread?.send(
 			multiUserSelection: party.filter { alive[$0]! },
 			id: .nominate,
@@ -760,7 +803,7 @@ public class State<Comm: Communication> {
 		_ = try await thread?.send(
 			multiUserSelection: party.filter { alive[$0]! },
 			id: .nominate,
-			label: i18n.nominationEndingSoonTitle(seconds: Waits.nominationsEnding.durationSeconds)
+			label: i18n.nominationEndingSoonTitle(seconds: Waits.nominationsEnding.durationSeconds(speed))
 		)
 
 		try await waitFor(Waits.nominationsEnding)
@@ -806,13 +849,42 @@ public class State<Comm: Communication> {
 		return (parts[0], parts[1], parts[2])
 	}
 
+	func createTalkThreads() async throws {
+		var it = Array(party)
+		it.append(it.first!)
+
+		for idx in 0...it.count-2 {
+			let tuple = UserList<Comm>(users: [it[idx], it[idx+1]])
+			let pings = tuple.users.map { "\($0.mention()) "}.joined(separator: ", ")
+
+			if tuple.users.allSatisfy({ teams[$0] == .werewolf }) {
+				continue
+			}
+
+			let thread = try await comm.createTalkThread(state: self, users: tuple)
+			threads[tuple] = thread
+			_ = try await thread?.send(i18n.talkThreadGetOverHere(pings))
+			_ = try await Task.sleep(nanoseconds: 500_000_000)
+		}
+
+		if teams.filter({ $0.value == .werewolf }).count > 1 {
+			let evil = UserList<Comm>(users: party.filter({ teams[$0] == .werewolf }))
+			let pings = evil.users.map { "\($0.mention()) "}.joined(separator: ", ")
+			let thread = try await comm.createTalkThread(state: self, users: evil)
+			threads[evil] = thread
+			_ = try await thread?.send(i18n.evilTalkThreadGetOverHere(pings))
+			_ = try await Task.sleep(nanoseconds: 500_000_000)
+		}
+	}
+
 	func startPlaying() async throws {
 		state = .playing
 
 		roleMessages = [:]
 
-		// TODO: create a thread
 		thread = try await comm.createGameThread(state: self)
+
+		try await createTalkThreads()
 
 		let partyPings = party.map { "\($0.mention()) "}.joined(separator: ", ")
 		_ = try await thread?.send(i18n.getOverHere(partyPings))
@@ -1295,8 +1367,8 @@ public class State<Comm: Communication> {
 	]
 	public let stringCommands = [
 		"role": role,
-		"create": create,
 	]
+	public let createCommand = create
 
 	func resetParty() async throws {
 		for item in party {
@@ -1306,20 +1378,20 @@ public class State<Comm: Communication> {
 	}
 
 	// command implementations
-	func create(who: Comm.UserID, language: String, interaction: Comm.Interaction) async throws {
+	func create(who: Comm.UserID, language: GameLanguage, speed: GameSpeed, interaction: Comm.Interaction) async throws {
 		guard state == .idle else {
 			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
 			return
 		}
 
 		switch language {
-		case "toki_pona":
-			i18n = TokiPona()
-		case "english":
+		case .english:
 			i18n = English()
-		default:
-			break
+		case .tokiPona:
+			i18n = TokiPona()
 		}
+
+		self.speed = speed
 
 		try await resetParty()
 

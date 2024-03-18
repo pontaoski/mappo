@@ -70,6 +70,8 @@ public protocol I18n {
     func morningTitle(_ toy: TimeOfYear, year: Int, day: Int) -> String
     func votingTitle(numNominations: Int) -> String
     func getOverHere(_ list: String) -> String
+    func talkThreadGetOverHere(_ list: String) -> String
+    func evilTalkThreadGetOverHere(_ list: String) -> String
     func beholderSeer(who: Mentionable) -> String
     func laundrypersonStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String
     func gossip(_ p1: Mentionable, _ p2: Mentionable, _ p3: Mentionable) -> String
@@ -431,6 +433,12 @@ public struct English: I18n {
     }
     public func getOverHere(_ list: String) -> String {
         return "\(list), get over here!"
+    }
+    public func talkThreadGetOverHere(_ list: String) -> String {
+        return "\(list), this is your private talk thread! Say whatever you want about the game here."
+    }
+    public func evilTalkThreadGetOverHere(_ list: String) -> String {
+        return "\(list), this is your private talk thread! Say whatever you want about the game here. You are all evil!"
     }
     public func exilingTitle(who: Mentionable) -> String {
         return "Looks like we're exiling \(who.mention()) tonight! Bye-bye!"
@@ -851,6 +859,12 @@ public struct TokiPona: I18n {
     }
     public func getOverHere(_ list: String) -> String {
         return "\(list), o kama ni!"
+    }
+    public func talkThreadGetOverHere(_ list: String) -> String {
+        return "\(list), ni li tomo toki pi sina tu a! sina ken toki lon tomo ni a!"
+    }
+    public func evilTalkThreadGetOverHere(_ list: String) -> String {
+        return "\(list), ni li tomo toki pi sina ale a! sina ale li wile moli e ma tomo a!"
     }
     public func exilingTitle(who: Mentionable) -> String {
         return "lukin la, jan li wile weka e \(who.mention())! tawa pona a!"

@@ -665,7 +665,8 @@ public class State<Comm: Communication> {
 		}
 
 		timer = Task {
-			try await waitFor(.waitingToJoin)
+			try await Task.sleep(nanoseconds: Waits.waitingToJoin.durationNanoseconds(speed))
+			try Task.checkCancellation()
 			try await self.startTimerExpired()
 			self.timer = nil
 		}
@@ -675,12 +676,15 @@ public class State<Comm: Communication> {
 	func waitFor(_ wait: Waits) async throws {
 		currentPause = Task {
 			try await Task.sleep(nanoseconds: wait.durationNanoseconds(speed))
+			try Task.checkCancellation()
 		}
 		let _ = await currentPause?.result
 	}
 
 	func cancelPause() async throws {
-		if let task = currentPause {
+		if let task = timer {
+			task.cancel()
+		} else if let task = currentPause {
 			task.cancel()
 		}
 	}

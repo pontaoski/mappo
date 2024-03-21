@@ -682,9 +682,7 @@ public class State<Comm: Communication> {
 	}
 
 	func cancelPause() async throws {
-		if let task = timer {
-			task.cancel()
-		} else if let task = currentPause {
+		if let task = currentPause {
 			task.cancel()
 		}
 	}

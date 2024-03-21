@@ -665,7 +665,7 @@ public class State<Comm: Communication> {
 		}
 
 		timer = Task {
-			try await Task.sleep(nanoseconds: Waits.waitingToJoin.durationNanoseconds(speed))
+			try await waitFor(.waitingToJoin)
 			try Task.checkCancellation()
 			try await self.startTimerExpired()
 			self.timer = nil

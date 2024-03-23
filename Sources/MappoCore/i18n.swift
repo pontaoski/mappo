@@ -77,11 +77,13 @@ public protocol I18n {
     func gossip(_ p1: Mentionable, _ p2: Mentionable, _ p3: Mentionable) -> String
     func librarianStart(_ p1: Mentionable, _ p2: Mentionable, _ role: Role) -> String
     func gooseKillMessage(who: Mentionable) -> String
+    func diedMessage(who: Mentionable) -> String
     func werewolfKillMessage(who: Mentionable) -> String
     func exilingTitle(who: Mentionable) -> String
     func notExilingTitle(who: Mentionable) -> String
     func votingPersonTitle(who: Mentionable) -> String
     func nightStatus(who: Mentionable, role: Role, alive: Bool) -> String
+    func nightStatusRoleless(who: Mentionable, alive: Bool) -> String
     func drVisitAlso(who: Mentionable) -> String
     func visitedWerewolf(who: Mentionable) -> String
     func visitedWerewolfEaten(who: Mentionable) -> String
@@ -164,6 +166,7 @@ public protocol I18n {
     var drProtect: String { get }
     var drInnocent: String { get }
     var drGoose: String { get }
+    var youDied: String { get }
     var alreadyInParty: String { get }
     var alreadyInAnotherParty: String { get }
     func joinedParty(who: Mentionable) -> String
@@ -214,6 +217,9 @@ public struct English: I18n {
     }
 
     public func gooseKillMessage(who: Mentionable) -> String { "The Geese try to stab \(who.mention()) with \(English.gooseDeathItems.randomElement()!)..." }
+    public func diedMessage(who: Mentionable) -> String {
+        "\(who.mention()) died."
+    }
     public func werewolfKillMessage(who: Mentionable) -> String { "The Werewolves try to kill \(who.mention())..." }
     public func visitedWerewolf(who: Mentionable) -> String { "\(who.mention()) decided to visit a Werewolf, uh-oh..." }
     public func visitedWerewolfEaten(who: Mentionable) -> String { "and \(who.mention()) got eaten!" }
@@ -376,6 +382,7 @@ public struct English: I18n {
     public let drProtect = "You died because you protected a werewolf!"
     public let drInnocent = "You died because you were the first person to nominate an Innocent!"
     public let drGoose = "A goose killed you!"
+    public let youDied = "You died."
     public let leaveLeaveQueue = "You have left the leave queue! You will stay in the game"
     public let addedJoinQueue = "You have been added to the join queue! You will join when the current game is over"
     public let alreadyInParty = "You're already in the party!"
@@ -429,7 +436,14 @@ public struct English: I18n {
         if alive {
             return "🙂 \(who.mention())"
         } else {
-            return "💀 \(who.mention()) (was a \(role.emoji) \(roleName(role)))" // TODO: should we show people's roles when they die?
+            return "💀 \(who.mention()) (was a \(role.emoji) \(roleName(role)))"
+        }
+    }
+    public func nightStatusRoleless(who: Mentionable, alive: Bool) -> String {
+        if alive {
+            return "🙂 \(who.mention())"
+        } else {
+            return "💀 \(who.mention())"
         }
     }
     public func beholderSeer(who: Mentionable) -> String {
@@ -667,6 +681,9 @@ public struct TokiPona: I18n {
     }
 
     public func gooseKillMessage(who: Mentionable) -> String { "waso li alasa moli e \(who.mention()) kepeken \(TokiPona.gooseDeathItems.randomElement()!)..." }
+    public func diedMessage(who: Mentionable) -> String {
+        "\(who.mention()) li moli."
+    }
     public func werewolfKillMessage(who: Mentionable) -> String { "soweli mun li alasa moli e \(who.mention())..." }
     public func visitedWerewolf(who: Mentionable) -> String { "\(who.mention()) li tawa tomo pi soweli mun, pakala..." }
     public func visitedWerewolfEaten(who: Mentionable) -> String { "\(who.mention()) li kama moku!" }
@@ -806,6 +823,7 @@ public struct TokiPona: I18n {
     public let drProtect = "sina kama moli tan ni: sina awen e soweli mun!"
     public let drInnocent = "sina wile weka e jan pi ike ala  la, sina kama moli!"
     public let drGoose = "waso li moli e sina!"
+    public let youDied = "sina moli."
     public let leaveLeaveQueue = "sina kama weka tan tomo weka! sina awen lon musi."
     public let addedJoinQueue = "sina kama lon tomo kama! musi ni li pini la, sina kama lon musi."
     public let alreadyInParty = "sina awen lon tomo musi!"
@@ -858,6 +876,13 @@ public struct TokiPona: I18n {
             return "🙂 \(who.mention())"
         } else {
             return "💀 \(who.mention()) (li \(role.emoji) \(roleName(role)))" // TODO: should we show people's roles when they die?
+        }
+    }
+    public func nightStatusRoleless(who: Mentionable, alive: Bool) -> String {
+        if alive {
+            return "🙂 \(who.mention())"
+        } else {
+            return "💀 \(who.mention())"
         }
     }
     public func beholderSeer(who: Mentionable) -> String {

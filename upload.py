@@ -30,6 +30,16 @@ commands = [
             { "name": "Normal", "value": "normal" },
             { "name": "Manual", "value": "manual" },
         ],
+    },{
+        "name": "revealroles",
+        "description": "Whether or not to reveal roles on death",
+        "required": False,
+        "type": 5,
+    },{
+        "name": "deathreasons",
+        "description": "Whether or not to show detailed death reasons",
+        "required": False,
+        "type": 5,
     }],"description":"Creates a new game","default_permission":True,"name":"create"},
     {"type":1,"options":[],"description":"Join a lobby","default_permission":True,"name":"join"},
     {"type":1,"options":[],"description":"Leave a lobby","default_permission":True,"name":"leave"},

@@ -618,6 +618,10 @@ public class State<Comm: Communication> {
 
 	var speed: GameSpeed
 
+	var revealRoles: Bool
+
+	var deathReasons: Bool
+
 	let logger = Logger(label: "cc.blackquill.Mappo")
 
 	public init(for channel: Comm.Channel, in comm: Comm, eventLoop: EventLoop) {
@@ -630,6 +634,8 @@ public class State<Comm: Communication> {
 		self.votes = [:]
 		self.i18n = channel.i18n()
 		self.speed = .normal
+		self.revealRoles = false
+		self.deathReasons = false
 	}
 
 	func resetVotes() {
@@ -917,7 +923,11 @@ public class State<Comm: Communication> {
 	func nightStatus() async throws {
 		let txt = party.map { ($0, alive[$0]!) }
 			.map { item -> String in
-				i18n.nightStatus(who: item.0, role: roles[item.0]!, alive: item.1)
+				if revealRoles {
+					i18n.nightStatus(who: item.0, role: roles[item.0]!, alive: item.1)
+				} else {
+					i18n.nightStatusRoleless(who: item.0, alive: item.1)
+				}
 			}
 			.joined(separator: "\n")
 		_ = try await thread?.send(CommunicationEmbed(title: i18n.aliveTitle, body: txt))
@@ -1011,7 +1021,11 @@ public class State<Comm: Communication> {
 		case .goose:
 			reason = i18n.drGoose
 		}
-		_ = try await dm?.send(CommunicationEmbed(body: reason, color: .bad))
+		if deathReasons {
+			_ = try await dm?.send(CommunicationEmbed(body: reason, color: .bad))
+		} else {
+			_ = try await dm?.send(CommunicationEmbed(body: i18n.youDied, color: .bad))
+		}
 		alive[who] = false
 
 		if roles[who] == .werewolf && !roles.contains(where: { alive[$0.key]! && $0.value == .werewolf }) {
@@ -1034,39 +1048,63 @@ public class State<Comm: Communication> {
 	func attemptKill(_ who: Comm.UserID, because why: DeathReason<Comm>) async throws {
 		switch why {
 		case .werewolf, .goose:
-			if why == .goose {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.gooseKillMessage(who: who)))
-			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.werewolfKillMessage(who: who)))
-			}
+			if deathReasons {
+				if why == .goose {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.gooseKillMessage(who: who)))
+				} else {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.werewolfKillMessage(who: who)))
+				}
 
-			try await Task.sleep(nanoseconds: 3_000_000_000)
+				try await Task.sleep(nanoseconds: 3_000_000_000)
+			}
 
 			if actions.contains(where: { $0.key == who && $0.value == .kill(who: who)}) {
 				if Double.random(in: 0...1) < (werewolfKillSuccessRate * 0.2) {
-					_ = try await thread?.send(CommunicationEmbed(body: i18n.killSuccess, color: .bad))
+					if deathReasons {
+						_ = try await thread?.send(CommunicationEmbed(body: i18n.killSuccess, color: .bad))
+					} else {
+						_ = try await thread?.send(CommunicationEmbed(body: i18n.diedMessage(who: who), color: .bad))
+					}
 					try await kill(who, because: why)
 				} else {
-					_ = try await thread?.send(CommunicationEmbed(body: i18n.killFailure, color: .good))
+					if deathReasons {
+						_ = try await thread?.send(CommunicationEmbed(body: i18n.killFailure, color: .good))
+					}
 				}
 			} else if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.killProtected, color: .good))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.killProtected, color: .good))
+				}
 			} else if actions.contains(where: { $0.key == who && $0.value.awayFromHome && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.killAwayFromHome, color: .good))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.killAwayFromHome, color: .good))
+				}
 			} else if Double.random(in: 0...1) < werewolfKillSuccessRate {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.killSuccess, color: .bad))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.killSuccess, color: .bad))
+				} else {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.diedMessage(who: who), color: .bad))
+				}
 				try await kill(who, because: why)
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.killFailure, color: .good))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.killFailure, color: .good))
+				}
 			}
 		case .visitedWerewolf:
 			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolf(who: who), color: .bad))
 			try await Task.sleep(nanoseconds: 3_000_000_000)
 
 			if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfProtected(who: who), color: .good))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfProtected(who: who), color: .good))
+				}
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfEaten(who: who), color: .bad))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedWerewolfEaten(who: who), color: .bad))
+				} else {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.diedMessage(who: who), color: .bad))
+				}
 
 				try await kill(who, because: .visitedWerewolf)
 			}
@@ -1074,9 +1112,15 @@ public class State<Comm: Communication> {
 			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolf(who: who, visiting: visiting), color: .bad))
 			try await Task.sleep(nanoseconds: 3_000_000_000)
 			if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfProtected(who: who), color: .good))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfProtected(who: who), color: .good))
+				}
 			} else {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfEaten(who: who), color: .bad))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfEaten(who: who), color: .bad))
+				} else {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.diedMessage(who: who), color: .bad))
+				}
 				try await kill(who, because: why)
 			}
 			break
@@ -1091,7 +1135,11 @@ public class State<Comm: Communication> {
 			try await kill(who, because: why)
 		case .protectedWerewolf:
 			if Double.random(in: 0...1) > 0.5 {
-				_ = try await thread?.send(CommunicationEmbed(body: i18n.protectedWerewolf(who: who), color: .bad))
+				if deathReasons {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.protectedWerewolf(who: who), color: .bad))
+				} else {
+					_ = try await thread?.send(CommunicationEmbed(body: i18n.diedMessage(who: who), color: .bad))
+				}
 
 				try await kill(who, because: .protectedWerewolf)
 			}
@@ -1381,7 +1429,7 @@ public class State<Comm: Communication> {
 	}
 
 	// command implementations
-	func create(who: Comm.UserID, language: GameLanguage, speed: GameSpeed, interaction: Comm.Interaction) async throws {
+	func create(who: Comm.UserID, language: GameLanguage, speed: GameSpeed, revealRoles: Bool, deathReasons: Bool, interaction: Comm.Interaction) async throws {
 		guard state == .idle else {
 			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
 			return
@@ -1395,6 +1443,8 @@ public class State<Comm: Communication> {
 		}
 
 		self.speed = speed
+		self.revealRoles = revealRoles
+		self.deathReasons = deathReasons
 
 		try await resetParty()
 

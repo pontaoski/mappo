@@ -389,7 +389,25 @@ class MyBot {
 					GameSpeed.normal
 				}
 			}
-			try await state.createCommand(state)(user.id, language, speed, intr)
+			let revealRoles: Bool = switch opt.first(where: {$0.name == "revealroles"}) {
+			case nil: false
+			case .some(let it):
+				if let val = try it.value?.requireBool() {
+					val
+				} else {
+					false
+				}
+			}
+			let deathReasons: Bool = switch opt.first(where: {$0.name == "deathreasons"}) {
+			case nil: false
+			case .some(let it):
+				if let val = try it.value?.requireBool() {
+					val
+				} else {
+					false
+				}
+			}
+			try await state.createCommand(state)(user.id, language, speed, revealRoles, deathReasons, intr)
 		} else {
 			try await intr.reply(with: "Oops, I don't understand what you just did (\(cmd)). Sorry.", epheremal: true)
 		}

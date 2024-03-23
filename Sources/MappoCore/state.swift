@@ -450,7 +450,7 @@ public enum Waits {
 		case .dayEnding: 30
 		case .nominationsStart: 20
 		case .nominationsEnding: 20
-		case .waitingToJoin: 25
+		case .waitingToJoin: 35
 		case .waitingToReadRoles: 15
 		}
 	}
@@ -688,7 +688,7 @@ public class State<Comm: Communication> {
 	}
 
 	func startTimerExpired() async throws {
-		guard party.count >= 3 else {
+		guard party.count >= 4 else {
 			state = .idle
 			try await resetParty()
 			clear()
@@ -1362,6 +1362,7 @@ public class State<Comm: Communication> {
 		"party": party,
 		"roles": sendRoles,
 		"continue": continueTimer,
+		"extend": extend,
 	]
 	public let userCommands = [
 		"promote": promote,
@@ -1413,7 +1414,11 @@ public class State<Comm: Communication> {
 
 	func join(who: Comm.UserID, interaction: Comm.Interaction) async throws {
 		guard state == .joining else {
-			try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
+			if state == .idle {
+				try await interaction.reply(with: i18n.noLobbyExists, epheremal: true)
+			} else {
+				try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
+			}
 			return
 		}
 		guard !party.contains(who) else {
@@ -1461,9 +1466,29 @@ public class State<Comm: Communication> {
 		try await interaction.reply(with: i18n.resumed, epheremal: true)
 	}
 	func party(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard state != .idle else {
+			try await interaction.reply(with: i18n.noLobbyExists, epheremal: true)
+			return
+		}
 		_ = try await interaction.reply(
 			with: CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "\($0.mention())" }.joined(separator: "\n")),
 			epheremal: false
+		)
+	}
+	func extend(who: Comm.UserID, interaction: Comm.Interaction) async throws {
+		guard state == .joining else {
+			if state == .idle {
+				try await interaction.reply(with: i18n.noLobbyExists, epheremal: true)
+			} else {
+				try await interaction.reply(with: i18n.gameAlreadyInProgress, epheremal: true)
+			}
+			return
+		}
+		resetStartTimer()
+		try await interaction.reply(with: i18n.joinTimeExtended, epheremal: false)
+		_ = try await channel.send(
+			CommunicationEmbed(title: i18n.partyListTitle, body: party.map { "\($0.mention())" }.joined(separator: "\n")),
+			[.init(id: .joinGame, label: i18n.joinGame)]
 		)
 	}
 	func promote(who: Comm.UserID, target: Comm.UserID, interaction: Comm.Interaction) async throws {

@@ -36,6 +36,7 @@ commands = [
     {"type":1,"options":[],"description":"View the current party","default_permission":True,"name":"party"},
     {"type":1,"options":[],"description":"Lists all roles","default_permission":True,"name":"roles"},
     {"type":1,"options":[],"description":"Instantly completes the current wait","default_permission":True,"name":"continue"},
+    {"type":1,"options":[],"description":"Extends the joining time","default_permission":True,"name":"extend"},
     {"type":1,"options":[{
         "name": "role",
         "description": "The role whose information to get",
@@ -63,8 +64,3 @@ headers = {
 resp = requests.put(url, headers=headers, json=commands)
 print(resp)
 sleep(4.5)
-
-for cmd in ["1013538476844658799", "1013538497132498945", "1013538517881720832"]:
-    resp = requests.delete(url + "/" + cmd, headers=headers)
-    print(resp)
-    sleep(4.5)

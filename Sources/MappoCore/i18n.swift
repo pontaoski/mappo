@@ -174,6 +174,8 @@ public protocol I18n {
     var voteWasTie: String { get }
     var mustBePartyLeader: String { get }
     var gameAlreadyInProgress: String { get }
+    var noLobbyExists: String { get }
+    var joinTimeExtended: String { get }
     var atLeastFourPeopleNeeded: String { get }
     var lobbyNotInRightState: String { get }
     var gameHasBeenStarted: String { get }
@@ -390,6 +392,8 @@ public struct English: I18n {
     public let voteWasTie = "The vote was a tie, nobody's being exiled tonight!"
     public let mustBePartyLeader = "You must be the party leader to do that!"
     public let gameAlreadyInProgress = "A game is already in progress!"
+    public let noLobbyExists = "No lobby is active right now."
+    public let joinTimeExtended = "Join time has been extended!"
     public let atLeastFourPeopleNeeded = "You need at least 4 people to start playing!"
     public let gameHasBeenSetUp = "You're all set to go! You can start playing now."
     public let lobbyNotInRightState = "The lobby isn't in the right state for that"
@@ -816,6 +820,8 @@ public struct TokiPona: I18n {
     public let voteWasTie = "wile weka pi mute sama li lon la, mi ken ala sona e wile weka suli. jan ala li weka tan kulupu."
     public let mustBePartyLeader = "sina nanpa wan lon kulupu ala la sina ken ala ni."
     public let gameAlreadyInProgress = "ni li ken ala tan ni: musi li lon a!"
+    public let noLobbyExists = "kulupu musi li lon ala."
+    public let joinTimeExtended = "tenpo kama li suli sin a!"
     public let atLeastFourPeopleNeeded = "musi la sina wile e kulupu 4 anu mute."
     public let gameHasBeenSetUp = "musi li ken open a!"
     public let lobbyNotInRightState = "tenpo ni la kulupu li ken ala ni"

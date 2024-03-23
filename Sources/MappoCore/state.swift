@@ -1170,6 +1170,7 @@ public class State<Comm: Communication> {
 				let myDM = try await comm.getChannel(for: key, state: self)
 				_ = try await dm?.send(CommunicationEmbed(body: i18n.inebriatedFailureDM, color: .bad))
 				_ = try await myDM?.send(CommunicationEmbed(body: i18n.bartenderStopped(who), color: .info))
+				actions.removeValue(forKey: who)
 			case .inebriateRandom(let who):
 				let myDM = try await comm.getChannel(for: key, state: self)
 				_ = try await myDM?.send(CommunicationEmbed(body: i18n.bartenderRandomised(who), color: .info))

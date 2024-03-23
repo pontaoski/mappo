@@ -829,6 +829,11 @@ public class State<Comm: Communication> {
 			try await sendVotes()
 			return
 		}
+		guard highestVote >= 2 else {
+			try await nightStatus()
+			try await sendVotes()
+			return
+		}
 
 		_ = try await thread?.send(i18n.exilingTitle(who: highestVote.key))
 		try await sendVotes()

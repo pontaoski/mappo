@@ -1114,8 +1114,10 @@ public class State<Comm: Communication> {
 				try await kill(who, because: .visitedWerewolf)
 			}
 		case .visitedSomeoneBeingVisitedByWerewolf(let visiting):
-			_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolf(who: who, visiting: visiting), color: .bad))
-			try await Task.sleep(nanoseconds: 3_000_000_000)
+			if deathReasons {
+				_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolf(who: who, visiting: visiting), color: .bad))
+				try await Task.sleep(nanoseconds: 3_000_000_000)
+			}
 			if actions.contains(where: { $0.value == .protect(who: who) && $0.value.isValid(doer: $0.key, with: actions.values) }) {
 				if deathReasons {
 					_ = try await thread?.send(CommunicationEmbed(body: i18n.visitedPersonBeingVisitedByWerewolfProtected(who: who), color: .good))
